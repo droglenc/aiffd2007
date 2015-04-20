@@ -1,0 +1,19 @@
+# Box 7_3.txt
+#
+veg	lake	cpue
+absent	A	63
+absent	B	45
+absent	C	30
+absent	D	50
+absent	E	80
+absent	F	67
+absent	G	48
+absent	H	55
+present	A	70
+present	B	56
+present	C	42
+present	D	68
+present	E	87
+present	F	75
+present	G	49
+present	H	62

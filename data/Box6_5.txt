@@ -1,0 +1,13 @@
+# Box6_5.txt
+#
+# year.class: year-class of fish
+# catch: catch of white crappies in trap-nets in 2001 (unadjusted)
+# age0: catch of age-0 white crappies between 1995 and 2000 (estimate of recruitment)
+#
+year.class  catch age0
+2000        150   1665
+1999         28    556
+1998          5    111
+1997         69   2330
+1996         12    445
+1995         17   1220

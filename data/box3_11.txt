@@ -1,0 +1,32 @@
+# Box 3.11.  Example of an analysis of covariance design.;
+#
+id substrate egg_diameter growth
+ 1       Cobble        8.3    20.0
+ 2       Cobble        8.5    23.5
+ 3       Cobble       11.2    24.7
+ 4       Cobble       10.7    29.5
+ 5       Cobble        9.6    24.3
+ 6       Cobble       11.8    31.7
+ 7       Cobble        9.6    22.1
+ 8       Cobble        8.9    19.0
+ 9       Cobble       11.2    17.3
+10       Cobble        8.9    23.3
+ 1       Gravel       10.3    36.4
+ 2       Gravel        9.5    25.7
+ 3       Gravel        8.5    13.6
+ 4       Gravel        9.9    33.9
+ 5       Gravel        8.6    17.1
+ 6       Gravel        8.9    22.6
+ 7       Gravel       10.4    32.0
+ 8       Gravel       10.8    40.2
+ 9       Gravel        9.9    26.6
+10       Gravel       10.1    32.9
+ 1       Sand          9.3    20.4
+ 2       Sand          8.8    15.3
+ 3       Sand          9.2    21.6
+ 4       Sand         10.0    22.9
+ 5       Sand         10.5    21.2
+ 6       Sand         10.2    17.4
+ 7       Sand          9.4    12.4
+ 9       Sand         10.7    21.8
+10       Sand         11.8    25.0

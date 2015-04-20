@@ -1,0 +1,19 @@
+#Box 3.13.  Example of a factorial design.
+#
+year size release survival                                      
+1987 Sub       On  0.058
+1987 Sub       Off 0.155
+1987 Yearling  On  0.406
+1987 Yearling  Off 0.319
+1988 Sub       On  0.058
+1988 Sub       Off 0.004
+1988 Yearling  On  0.350
+1988 Yearling  Off 1.376
+1989 Sub       On  0.014
+1989 Sub       Off 0.008
+1989 Yearling  On  0.092
+1989 Yearling  Off 0.320
+1990 Sub       On  0.047
+1990 Sub       Off 0.044
+1990 Yearling  On  0.599
+1990 Yearling  Off 3.048

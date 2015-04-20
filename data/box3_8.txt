@@ -1,0 +1,25 @@
+# Box 3.8
+#
+lake		region	bag_limit	catch
+Willow 		North      1       2.21
+Mud     	North      1       2.32
+Pine     	North      1       2.74
+Bass     	North      2       2.23
+Perch    	North      2       2.25
+Twin     	North      2       1.40
+Park      	North      2       2.36
+Mendota   	North      5       1.78
+Silver		North      5       1.64
+Manistee  	North      5       1.97
+Fox		North      5       1.99
+McGee		South      1       2.70
+Deep		South      1       3.63
+Round		South      1       2.82
+Long		South      2       3.09
+Portage		South      2       3.63
+Indian		South      2       2.82
+Wolf		South      5       2.20
+Gull		South      5       1.74
+Black		South      5       2.85
+Goose     	South      5       3.01
+Fletcher	South      5       1.72

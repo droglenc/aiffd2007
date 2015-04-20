@@ -1,0 +1,16 @@
+# Box6_3.txt
+#
+# age: age (in years)
+# catch: catch
+#
+age catch
+1    90
+2   164
+3   162
+4   110
+5    55
+6    41
+7    20
+8    14
+9     7
+10    5

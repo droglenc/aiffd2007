@@ -1,0 +1,7 @@
+trial	tag.color	prey.init	prey.final
+1	Bright	120	22
+1	Cryptic	60	21
+2	Bright	96	26
+2	Cryptic	48	15
+3	Bright	150	64
+3	Cryptic	75	35

@@ -1,0 +1,24 @@
+# Box6_6.txt
+#
+# age: fish age
+# catch: catch of fish
+# lake: sampled lake
+#
+age catch lake
+1   433   A
+2   818   A
+3   243   A
+4    67   A
+5    48   A
+6     5   A
+7    30   A
+8    42   A
+9    22   A
+1   305   B
+2   491   B
+3   155   B
+4   100   B
+5    30   B
+6    49   B
+7    16   B
+8     6   B
