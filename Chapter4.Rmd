@@ -1,0 +1,213 @@
+---
+title: "AIFFD Chapter 4 - Recruitment"
+author: "Derek H. Ogle"
+csl: american-fisheries-society.csl
+output:
+  pdf_document:
+    fig_caption: yes
+    fig_height: 3.5
+    fig_width: 3.5
+    number_sections: yes
+    pandoc_args: --number-offset=4
+    toc: yes
+  html_document:
+    fig_caption: yes
+    fig_height: 4.5
+    fig_width: 4.5
+    highlight: tango
+    number_sections: yes
+    pandoc_args: --number-offset=4
+    toc: yes
+bibliography: AIFFDReferences.bib
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+stime <- proc.time()     ## Start time to get processing time
+```
+
+--------------------------------------------------------------
+
+This document contains R versions of the boxed examples from **Chapter 4** of the *Analysis and Interpretation of Freshwater Fisheries Data* book.  Some sections build on descriptions from previous sections, so each section may not stand completely on its own.  More thorough discussions of the following items are available in linked vignettes:
+
+* the use of linear models in R in the linear models vignette,
+* differences between and the use of type-I, II, and III sums-of-squares in the preliminaries vignette, and
+* the use of "least-squares means" is found in the preliminaries vignette.
+
+The following additional packages are required to complete all of the examples (with the required functions noted as a comment and also noted in the specific examples below).
+```{r pkgs, echo=-1, warning=FALSE, message=FALSE}
+rqrd <- c("FSA","car","Hmisc","Kendall","lsmeans","multcomp","nlstools","plotrix")
+library(FSA)          # fitPlot, Subset
+library(NCStats)      # addSigLetters
+library(car)          # Anova, durbinWatsonTest, vif
+library(Hmisc)        # rcorr
+library(Kendall)      # kendall
+library(lsmeans)      # lsmeans
+library(multcomp)     # glht, mcp, cld 
+library(nlstools)     # overview, nlsBoot
+library(plotrix)      # thigmophobe.labels, rescale
+```
+
+In addition, external tab-delimited text files are used to hold the data required for each example.  These data are loaded into R in each example with `read.table()`.  Before using `read.table()` the working directory of R must be set to where these files are located on **your** computer.  The working directory for all data files on **my** computer is set below.
+```{r setwd, eval=FALSE}
+setwd("c:/aaaWork/web/fishR/BookVignettes/AIFFD/")
+```
+
+In addition, I prefer to not show significance stars for hypothesis test output, reduce the margins on plots, alter the axis label positions, and reduce the axis tick length.  In addition, contrasts are set in such a manner as to force R output to match SAS output for linear model summaries.  All of these options are set below.
+```{r R.options}
+options(width=90,continue=" ",show.signif.stars=FALSE,contrasts=c("contr.sum","contr.poly"))
+par(mar=c(3.5,3.5,1,1),mgp=c(2.1,0.4,0),tcl=-0.2)
+```
+
+--------------------------------------------------------------
+
+## Log-Linear Model to Test for Year-Class Abundance Differences
+Below we conduct a test for year-class abundance differences among the 1990 to 1997 year-classes (`yearcl`) based on catch rates of age-0, age-1, and age-2 crappies (*Pomoxis* spp.) (`age` in years) from Weiss Lake (Table 4.1 in text).  Trap-net catch rates (`catch`) were transformed to natural log values to homogenize variances as recommended by [@Kimura1988] for log-linear analysis.  The data in Table 4.1 were rearranged to conduct the analysis.  Year of collection (`yearcol`) was included in the data file, and the following R code was used to conduct the analysis.
+
+###Preparing Data
+The `box4_1.txt` is read, the structure of the data frame is observed, and a new variable, `lcatch`, that is the natural log of the catch variable is created.
+```{r}
+d1 <- read.table("data/box4_1.txt",header=TRUE)
+str(d1)
+d1$lcatch <- log(d1$catch)
+```
+
+In addition, R must be told explicitly that `age` and `yearcl` are group factor rather than numeric variables.
+```{r}
+d1$age <- factor(d1$age)
+d1$yearcl <- factor(d1$yearcl)
+```
+
+### Two-Way ANOVA Model
+The authors of Box 4.1 fit a two-way ANOVA with**OUT** an interaction term.  While a two-way ANOVA is generally fit with an interaction term, not using an interaction term is appropriate here because an interaction cannot be estimated as there are not multiple observations for each combination of the two factors.  This fact is best illustrated with a two-way frequency table constructed from the two group factor variables with `table()`.
+```{r}
+table(d1$age,d1$yearcl)
+```
+
+The two-way ANOVA model without the interaction term is fit with `lm()`.  The ANOVA table using type-III SS is then extracted from the `lm()` object with `Anova()` from the `car` package.  From this, there is evidence for a significant difference in means among ages and among year-classes.
+```{r}
+lm1 <- lm(lcatch~age+yearcl,data=d1)
+Anova(lm1,type="III")
+```
+
+### Least-Squares Means for Year-Class
+Least-squares means are computed with `lsmeans()` from the `lsmeans` package using a right-hand-sided formula as the second argument to isolate the least-square means for each factor variable.  From this, it appears that CPE generally decreases (not surprisingly) with age and that 1990 and 1996 are relatively strong year-classes and 1991 is a relatively poor year-class.
+```{r}
+lsmeans(lm1,~age)
+lsmeans(lm1,~yearcl)
+```
+
+### Multiple Comparisons
+The authors of Box 4.1 use Fisher's LSD multiple comparison procedure.  In general, this procedure does not guard well against an inflated experimentwise error rate.  In general, Tukey's HSD procedure performs better in this regard and will be illustrated below.
+
+Tukey's multiple comparison procedure, implemented through `glht()` from the `multcomp` package, can be used to identify where the differences in means occur.  The `glht()` function requires the `lm()` object as the first argument.  The second argument is also required and uses `mcp()` to declare a "multiple comparison procedure."  In this instance the argument to `mcp()` is the factor variable in the `lm()` object for which you are testing for differences set equal to the `"Tukey"` string.  The result from `glht()` is saved to an object that can be submitted to `summary()` to extract p-values for each difference in pairs of means, to `confint()` to extract confidence intervals for each difference in pairs of means, and to `cld()` to identify significance letters that depict significant differences among means.
+```{r}
+mc1a <- glht(lm1,mcp(age="Tukey"))
+summary(mc1a)
+mc1yc <- glht(lm1,mcp(yearcl="Tukey"))
+summary(mc1yc)
+cld(mc1yc)
+```
+
+An plot of the group means, with appropriate confidence intervals is constructed with `fitPlot()` from the `FSA` package.  The significance letters can be added to the means plot with `addSigLetters()` from the `NCStats` package.  See `?addSigLetters` for a description of the arguments.
+```{r}
+fitPlot(lm1,which="yearcl",xlab="Year Class",ylab="Loge(Catch)",main="")
+addSigLetters(lm1,which="yearcl",lets=c("c","a","ab","bc","bc","ab","c","ab"), 
+              pos=c(4,2,2,2,4,2,2,2),cex=0.75)
+```
+
+
+## Evaluation of Time Series Trends in Recruit Abundance
+The following code presents a plot and computes the Pearson correlation coefficient between age-0 C/f (`age0cpe`) of white bass (*Morone chrysops*) and year and the Kendall tau-b non-parametric correlation coefficient for ranks between these two variables (data published in [@Madenjianetal2000]).  In addition, the simple linear regression between C/f and year was computed along with the Durbin-Watson statistic to determine temporal autocorrelation.  Finally, the residuals from the regression were plotted against year.
+
+###Preparing Data
+The `box4_2.txt` data file is read and the structure of the data frame is observed below.  It appears that the authors of Box 4.2 only used years from 1972-1997 in Box 4.2 even though the data provided on the CD with the AIFFD book is for 1969-1997.  Thus, a new data frame, called `d1`, restricted to years after 1971 is created with `Subset()` from the `FSA` package, with the original data frame as the first argument and a conditional statement from which to create the subset as the second argument.  Note that `Subset()` is very similar to `subset()` from base R with the exception that `Subset()` will remove unused levels from a factor variable after the subsetting.  This feature is useful in many situations but is irrelevant in this situation as the subsetting is conducted on a non-factor variable.
+
+```{r}
+d2 <- read.table("data/box4_2.txt",header=TRUE)
+str(d2)
+d2a <- Subset(d2,year>=1972)
+str(d2a)
+```
+
+### Summary Plot and Statistics
+The authors of Box 4.2 initially plot age-0 CPE against year.  This plot is constructed in R with the first use of `plot()` below.  I prefer to connect the points to more easily see the year-to-year pattern.  This modification is accomplished with the second use of `plot()` below (note the use of `type="b"` where `"b"` is for "both"" points and lines.)
+```{r}
+plot(age0cpe~year,data=d2a,ylab="Age-0 CPE",xlab="Year",main="",pch=19)
+plot(age0cpe~year,data=d2a,type="b",ylab="Age-0 CPE",xlab="Year",main="",pch=19)
+```
+
+The summary statistics presented in Box 4.2 are efficiently computed with `Summarize()` from the `FSA` package.
+```{r}
+Summarize(d2a$age0cpe,digits=4)
+Summarize(d2a$year,digits=4)
+```
+
+### Pearson Correlation Analysis
+The authors of Box 4.2 examined the correlation coefficient between `age0cpe` and `year`, with p-values corresponding to a test of whether the correlation is equal to zero or not.  The `rcorr()` function from the `Hmisc` package is needed to compute both the correlation coefficients AND the corresponding p-values.  [*NOTE: The correlation coefficients alone are computed with `cor` in base R.*]  The `rcorr()` function requires a **matrix** as the first argument so the two variables in the data frame must first be isolated and then coerced to a matrix with `as.matrix()`.
+```{r}
+rcorr(as.matrix(d2a[,c("age0cpe","year")]))
+```
+
+It should be noted that the relationship between `age0cpe` and `year` is clearly non-linear (as observed from the previous plot) indicating that the value of the correlation coefficient is not strictly interpretable (i.e., correlation coefficients assume a linear relationship).
+
+###Kendall's Tau Correlation Analysis}
+Kendall's tau-b correlation coefficient is computed by submitting the two variables as the first two arguments to `Kendall()` from the `Kendall` package.
+```{r}
+Kendall(d2a$age0cpe,d2a$year)
+```
+
+###Analysis of Residuals from Regression}
+The simple linear regression described in Box 4.2 is fit with `lm()`.  The ANOVA table is extracted from the `lm()` object with `anova()` and the coefficients or estimated parameters, among other summary information, is extracted with `summary()`.  Because of the evident non-linearity, this result is of dubious value.  However, if it were to be interpreted, it shows a significant negative relationship between age-0 CPE and year.
+```{r}
+lm1 <- lm(age0cpe~year,data=d2a)
+anova(lm1)
+summary(lm1)
+```
+
+The Durbin-Watson statistic is computed by submitting the `lm()` object as the first argument to `durbinWatsonTest()` from the `car` package.}.  By default `durbinWatsonTest()` computes the statistics only for times lags of one unit.  The `max.lag=` argument is used to compute the Durbin-Watson statistic for other time lags (illustrated below for a time lag of five years).  The autocorrelation value and test statistic for a time-lag of 1 are the same as shown in Box 4.2; however, the interpretation from the p-value shown here for a time-lag of 1 and what was described in Box 4.2 are different.  These results, if a 5% significance level is used, suggest that there is no significant autocorrelation up to fifth order time lags.
+```{r}
+durbinWatsonTest(lm1,max.lag=5)
+```
+
+The residuals from the model fit are stored in the `$residuals` object of the `lm()` object.  These residuals can be accessed to construct a plot of residuals versus year.
+```{r}
+plot(lm1$residuals~d2a$year,ylab="Residuals",xlab="Year",main="",pch=19)
+abline(h=0,lty=2)                          # adds horizontal reference line at 0
+plot(lm1$residuals~d2a$year,type="b",ylab="Residuals",xlab="Year",main="",pch=19)
+abline(h=0,lty=2)
+```
+
+###An Alternative Residual Analysis}
+The results from above indicate that a strong overall trend in the CPE data by year -- i.e., high and variable CPE in the early years followed by a much lower and less variable CPE in the later years.  The simple linear regression does not represent this trend very well as exhibited by the residual plot (above) and the following fitted-line plot constructed with `fitPlot()` from the `FSA` package.}.
+```{r}
+fitPlot(lm1,ylab="Age-0 CPE",xlab="Year",main="")
+```
+
+If the age-0 CPE is transformed to the log scale (new variable called `logage0cpe`) and a new linear model is fit then trends in the residuals with the overall trend removed more appropriately can be examined.
+```{r}
+d2a$logage0cpe <- log(d2a$age0cpe)
+lm2 <- lm(logage0cpe~year,data=d2a)
+plot(lm2$residuals~d2a$year,ylab="Residuals",xlab="Year",main="",pch=19)
+abline(h=0,lty=2)                          # adds horizontal reference line at 0
+plot(lm2$residuals~d2a$year,type="b",ylab="Residuals",xlab="Year",main="",pch=19)
+abline(h=0,lty=2)
+```
+
+With these changes, there is a significant negative trend in the relationship between log CPE of age-0 fish by year and neither the Durbin-Watson statistic (there is a weak suggestion for a time-lag of four years) or the auto-correlation function test (implemented with `ccf()`) found a significant auto-correlation in the data.
+```{r}
+anova(lm2)
+summary(lm2)
+durbinWatsonTest(lm2,max.lag=5)
+ccf(lm2$residuals,d2a$year)
+```
+
+For completeness, a fitted-"line" plot of the this alternative model to the original data is constructed by predicting log age-0 CPE for each year, back-transforming these values (i.e., using as the power of $e$), and the plotting the back-transformed values against year on top of a plot that already has the original values plotted against year.
+```{r}
+plot(age0cpe~year,data=d2a,ylab="Age-0 CPE",xlab="Year",pch=19)
+pCPE <- exp(predict(lm2))
+lines(pCPE~d2a$year,lwd=2,col="red")
+```
+
+
+
+--------------------------------------------------------------
