@@ -29,11 +29,7 @@ source('knitr_setup.R')
 
 --------------------------------------------------------------
 
-This document contains R versions of the boxed examples from **Chapter 4** of the *Analysis and Interpretation of Freshwater Fisheries Data* book.  Some sections build on descriptions from previous sections, so each section may not stand completely on its own.  More thorough discussions of the following items are available in linked vignettes:
-
-* the use of linear models in R in the linear models vignette,
-* differences between and the use of type-I, II, and III sums-of-squares in the preliminaries vignette, and
-* the use of "least-squares means" is found in the preliminaries vignette.
+This document contains R versions of the boxed examples from **Chapter 4** of the *Analysis and Interpretation of Freshwater Fisheries Data* book.  Some sections build on descriptions from previous sections, so each section may not stand completely on its own.  More thorough discussions of linear models; type-I, II, and III sums-of-squares, and least-squares means are found in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/).
 
 The following additional packages are required to complete all of the examples (with the required functions noted as a comment and also noted in the specific examples below).
 ```{r echo=-1, warning=FALSE, message=FALSE}
@@ -270,7 +266,7 @@ rmsp2(lm1)
 ### Multiple Comparisons
 The authors of the box use the Student-Newman-Keuls' (SNK) multiple comparison procedure.  The SNK method can provide more power than Tukey's HSD method but it tends not to control the experimentwise error rate at the desired level and, because it works in a sequential fashion, it does not produce appropriate confidence intervals (see [this](http://www.graphpad.com/faq/viewfaq.cfm?faq=1093) and Hsu (1996)).  Thus, in general, Tukey's HSD procedure performs better than SNK and will be illustrated below.
 
-Tukey's multiple comparison procedure is implemented with `glht()` as described in [#log-linear-model-to-test-for-year-class-abundance-differences](Box 4.1).  In this example, the model was refit without the `time:area` interaction because this term was insignificant as shown in the analysis above and its inclusion in the model causes problems when examining the multiple comparison procedures for just time.  Following the model refit below, the remaining commands below tell R to perform a Tukey multiple comparison procedure test on the `time` variable in the `lm1` model.
+Tukey's multiple comparison procedure is implemented with `glht()` as described in [Box 4.1](#log-linear-model-to-test-for-year-class-abundance-differences).  In this example, the model was refit without the `time:area` interaction because this term was insignificant as shown in the analysis above and its inclusion in the model causes problems when examining the multiple comparison procedures for just time.  Following the model refit below, the remaining commands below tell R to perform a Tukey multiple comparison procedure test on the `time` variable in the `lm1` model.
 ```{r}
 lm1a <- lm(terms(count~area+rep+area*rep+time,keep.order=TRUE),data=d3)
 mc1 <- glht(lm1a,mcp(time="Tukey"))
@@ -479,7 +475,7 @@ overview(nls2)
 
 ### Bootstrapping Confidence Intervals
 The `nlsBoot()` from the `nlstools` package is used to bootstrap the residuals from a non-linear model fit.  This function only requires the model as an argument, but the number of bootstrap samples can be controlled with the `niter=` argument.  The mean parameter values and confidence intervals are constructed from the saved `nlsBoot` object using `summary()`.
-```{r warning=FALSE, cache=FALSE}
+```{r warning=FALSE, cache=TRUE}
 bhbc <- nlsBoot(nls2,niter=2000)
 summary(bhbc)
 ```
@@ -628,7 +624,7 @@ overview(nls1)
 
 ### Bootstrapping - Basic Analyses
 The `nlsBoot()` function as described in [Box 4.7](#computation-of-the-beverton-holt-recruit-spawning-curve) is used to bootstrap the residuals from a non-linear model fit.  The `summary()` function can be used to extract the median values and 95% confidence intervals for each parameter from the bootstrap samples by submitting just the `nlsBoot` object.  The `confint()` function extracts just the confidence intervals for each parameter and allows the user to choose a level of confidence with the optional `conf.level=` argument.
-```{r}
+```{r, cache=TRUE}
 rbc <- nlsBoot(nls1,niter=2000)
 summary(rbc)
 confint(rbc)                  # default 95% CI

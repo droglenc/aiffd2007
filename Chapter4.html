@@ -93,12 +93,7 @@ img {
 
 <p></p>
 <hr />
-<p>This document contains R versions of the boxed examples from <strong>Chapter 4</strong> of the <em>Analysis and Interpretation of Freshwater Fisheries Data</em> book. Some sections build on descriptions from previous sections, so each section may not stand completely on its own. More thorough discussions of the following items are available in linked vignettes:</p>
-<ul>
-<li>the use of linear models in R in the linear models vignette,</li>
-<li>differences between and the use of type-I, II, and III sums-of-squares in the preliminaries vignette, and</li>
-<li>the use of “least-squares means” is found in the preliminaries vignette.</li>
-</ul>
+<p>This document contains R versions of the boxed examples from <strong>Chapter 4</strong> of the <em>Analysis and Interpretation of Freshwater Fisheries Data</em> book. Some sections build on descriptions from previous sections, so each section may not stand completely on its own. More thorough discussions of linear models; type-I, II, and III sums-of-squares, and least-squares means are found in the <a href="https://fishr.wordpress.com/books/aiffd/">preliminaries vignette</a>.</p>
 <p>The following additional packages are required to complete all of the examples (with the required functions noted as a comment and also noted in the specific examples below).</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">library</span>(FSA)          <span class="co"># fitPlot, Subset</span>
 &gt;<span class="st"> </span><span class="kw">library</span>(NCStats)      <span class="co"># addSigLetters</span>
@@ -436,7 +431,7 @@ Total    23 129.986                       </code></pre>
 <div id="multiple-comparisons-1" class="section level3">
 <h3><span class="header-section-number">4.3.4</span> Multiple Comparisons</h3>
 <p>The authors of the box use the Student-Newman-Keuls’ (SNK) multiple comparison procedure. The SNK method can provide more power than Tukey’s HSD method but it tends not to control the experimentwise error rate at the desired level and, because it works in a sequential fashion, it does not produce appropriate confidence intervals (see <a href="http://www.graphpad.com/faq/viewfaq.cfm?faq=1093">this</a> and Hsu (1996)). Thus, in general, Tukey’s HSD procedure performs better than SNK and will be illustrated below.</p>
-<p>Tukey’s multiple comparison procedure is implemented with <code>glht()</code> as described in <a href="Box%204.1">#log-linear-model-to-test-for-year-class-abundance-differences</a>. In this example, the model was refit without the <code>time:area</code> interaction because this term was insignificant as shown in the analysis above and its inclusion in the model causes problems when examining the multiple comparison procedures for just time. Following the model refit below, the remaining commands below tell R to perform a Tukey multiple comparison procedure test on the <code>time</code> variable in the <code>lm1</code> model.</p>
+<p>Tukey’s multiple comparison procedure is implemented with <code>glht()</code> as described in <a href="#log-linear-model-to-test-for-year-class-abundance-differences">Box 4.1</a>. In this example, the model was refit without the <code>time:area</code> interaction because this term was insignificant as shown in the analysis above and its inclusion in the model causes problems when examining the multiple comparison procedures for just time. Following the model refit below, the remaining commands below tell R to perform a Tukey multiple comparison procedure test on the <code>time</code> variable in the <code>lm1</code> model.</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>lm1a &lt;-<span class="st"> </span><span class="kw">lm</span>(<span class="kw">terms</span>(count~area+rep+area*rep+time,<span class="dt">keep.order=</span><span class="ot">TRUE</span>),<span class="dt">data=</span>d3)
 &gt;<span class="st"> </span>mc1 &lt;-<span class="st"> </span><span class="kw">glht</span>(lm1a,<span class="kw">mcp</span>(<span class="dt">time=</span><span class="st">&quot;Tukey&quot;</span>))
 &gt;<span class="st"> </span><span class="kw">summary</span>(mc1)</code></pre>
@@ -1276,8 +1271,8 @@ sample estimates:
 <hr />
 <pre><code>Reproducibility Information
   Compiled Date: Tue Apr 21 2015
-  Compiled Time: 10:26:48 AM
-  Code Execution Time: 19.49 s
+  Compiled Time: 11:50:08 AM
+  Code Execution Time: 5.28 s
 
   R Version: R version 3.2.0 (2015-04-16)
   System: Windows, i386-w64-mingw32/i386 (32-bit)
@@ -1293,8 +1288,8 @@ sample estimates:
   Other Packages: car_2.0-25, estimability_1.1, Formula_1.2-1, FSA_0.6.12,
     FSAdata_0.1.9, ggplot2_1.0.1, Hmisc_3.15-0, Kendall_2.2, knitr_1.9,
     lattice_0.20-31, lsmeans_2.16, multcomp_1.4-0, mvtnorm_1.0-2,
-    NCStats_0.4.3, nlstools_1.0-1, plotrix_3.5-11, survival_2.38-1,
-    TH.data_1.0-6
+    NCStats_0.4.3, nlstools_1.0-1, plotrix_3.5-11, rmarkdown_0.5.1,
+    survival_2.38-1, TH.data_1.0-6
   Loaded-Only Packages: acepack_1.3-3.3, assertthat_0.1, bitops_1.0-6,
     boot_1.3-16, caTools_1.17.1, cluster_2.0.1, codetools_0.2-11,
     colorspace_1.2-6, DBI_0.3.1, digest_0.6.8, dplyr_0.4.1, evaluate_0.6,
@@ -1304,9 +1299,9 @@ sample estimates:
     MASS_7.3-40, Matrix_1.2-0, mgcv_1.8-6, minqa_1.2.4, munsell_0.4.2,
     nlme_3.1-120, nloptr_1.0.4, nnet_7.3-9, parallel_3.2.0, pbkrtest_0.4-2,
     plyr_1.8.1, proto_0.3-10, quantreg_5.11, RColorBrewer_1.1-2,
-    Rcpp_0.11.5, relax_1.3.15, reshape2_1.4.1, rmarkdown_0.5.1,
-    rpart_4.1-9, sandwich_2.3-3, scales_0.2.4, sciplot_1.1-0, SparseM_1.6,
-    splines_3.2.0, stringr_0.6.2, tools_3.2.0, yaml_2.1.13, zoo_1.7-12</code></pre>
+    Rcpp_0.11.5, relax_1.3.15, reshape2_1.4.1, rpart_4.1-9, sandwich_2.3-3,
+    scales_0.2.4, sciplot_1.1-0, SparseM_1.6, splines_3.2.0, stringr_0.6.2,
+    tools_3.2.0, yaml_2.1.13, zoo_1.7-12</code></pre>
 <hr />
 <div class="references">
 <h2>References</h2>
