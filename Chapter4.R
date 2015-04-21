@@ -21,7 +21,7 @@ d1$lcatch <- log(d1$catch)
 d1$age <- factor(d1$age)
 d1$yearcl <- factor(d1$yearcl)
 
-table(d1$age,d1$yearcl)
+xtabs(~age+yearcl,data=d1)
 
 lm1 <- lm(lcatch~age+yearcl,data=d1)
 Anova(lm1,type="III")
@@ -317,4 +317,4 @@ par(mar=c(3.3,3.5,0.4,0.2),mgp=c(2.35,0.3,0))
 plot(rbc)
 
 
-# Script created at 2015-04-21 11:50:08
+# Script created at 2015-04-21 11:54:42

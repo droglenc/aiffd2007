@@ -81,9 +81,9 @@ d1$yearcl <- factor(d1$yearcl)
 ```
 
 ### Two-Way ANOVA Model
-The authors of the box fit a two-way ANOVA with**OUT** an interaction term.  While a two-way ANOVA is generally fit with an interaction term, not using an interaction term is appropriate here because an interaction cannot be estimated as there are not multiple observations for each combination of the two factors.  This fact is best illustrated with a two-way frequency table constructed from the two group factor variables with `table()`.
+The authors of the box fit a two-way ANOVA with**OUT** an interaction term.  While a two-way ANOVA is generally fit with an interaction term, not using an interaction term is appropriate here because an interaction cannot be estimated as there are not multiple observations for each combination of the two factors.  This fact is best illustrated with a two-way frequency table constructed from the two group factor variables with `xtabs()`.
 ```{r}
-table(d1$age,d1$yearcl)
+xtabs(~age+yearcl,data=d1)
 ```
 
 The two-way ANOVA model without the interaction term is fit with `lm()`.  The ANOVA table using type-III SS is then extracted from the `lm()` object with `Anova()` from the `car` package.  From this, there is evidence for a significant difference in means among ages and among year-classes.

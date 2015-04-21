@@ -131,10 +131,10 @@ img {
 </div>
 <div id="two-way-anova-model" class="section level3">
 <h3><span class="header-section-number">4.1.2</span> Two-Way ANOVA Model</h3>
-<p>The authors of the box fit a two-way ANOVA with<strong>OUT</strong> an interaction term. While a two-way ANOVA is generally fit with an interaction term, not using an interaction term is appropriate here because an interaction cannot be estimated as there are not multiple observations for each combination of the two factors. This fact is best illustrated with a two-way frequency table constructed from the two group factor variables with <code>table()</code>.</p>
-<pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">table</span>(d1$age,d1$yearcl)</code></pre>
-<pre><code>   
-    1990 1991 1992 1993 1994 1995 1996 1997
+<p>The authors of the box fit a two-way ANOVA with<strong>OUT</strong> an interaction term. While a two-way ANOVA is generally fit with an interaction term, not using an interaction term is appropriate here because an interaction cannot be estimated as there are not multiple observations for each combination of the two factors. This fact is best illustrated with a two-way frequency table constructed from the two group factor variables with <code>xtabs()</code>.</p>
+<pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">xtabs</span>(~age+yearcl,<span class="dt">data=</span>d1)</code></pre>
+<pre><code>   yearcl
+age 1990 1991 1992 1993 1994 1995 1996 1997
   0    1    1    1    1    1    1    1    1
   1    1    1    1    1    1    1    1    1
   2    1    1    1    1    1    1    1    1</code></pre>
@@ -1271,8 +1271,8 @@ sample estimates:
 <hr />
 <pre><code>Reproducibility Information
   Compiled Date: Tue Apr 21 2015
-  Compiled Time: 11:50:08 AM
-  Code Execution Time: 5.28 s
+  Compiled Time: 11:54:42 AM
+  Code Execution Time: 5.19 s
 
   R Version: R version 3.2.0 (2015-04-16)
   System: Windows, i386-w64-mingw32/i386 (32-bit)
