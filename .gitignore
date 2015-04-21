@@ -10,3 +10,8 @@ AIFFDReferences.bib.bak
 
 # Old knitr files
 old/
+.Rproj.user
+
+# Cache and other files
+*_cache/
+*_files/

@@ -3,13 +3,6 @@ title: "AIFFD Chapter 4 - Recruitment"
 author: "Derek H. Ogle"
 csl: american-fisheries-society.csl
 output:
-  pdf_document:
-    fig_caption: yes
-    fig_height: 3.5
-    fig_width: 3.5
-    number_sections: yes
-    pandoc_args: --number-offset=4
-    toc: yes
   html_document:
     fig_caption: yes
     fig_height: 4.5
@@ -18,11 +11,23 @@ output:
     number_sections: yes
     pandoc_args: --number-offset=4
     toc: yes
+    toc_depth: 2
+  pdf_document:
+    fig_caption: yes
+    fig_height: 3.5
+    fig_width: 3.5
+    number_sections: yes
+    pandoc_args: --number-offset=4
+    toc: yes
+    toc_depth: 2
 bibliography: AIFFDReferences.bib
 ---
+\setcounter{section}{4}
 
-```{r setup, echo=FALSE, include=FALSE}
-stime <- proc.time()     ## Start time to get processing time
+```{r echo=FALSE, include=FALSE}
+stime <- proc.time()    # Start time to get processing time
+library(knitr)          # knitr options -- output look
+opts_chunk$set(prompt=TRUE,comment='  ')
 ```
 
 --------------------------------------------------------------
@@ -34,7 +39,7 @@ This document contains R versions of the boxed examples from **Chapter 4** of th
 * the use of "least-squares means" is found in the preliminaries vignette.
 
 The following additional packages are required to complete all of the examples (with the required functions noted as a comment and also noted in the specific examples below).
-```{r pkgs, echo=-1, warning=FALSE, message=FALSE}
+```{r echo=-1, warning=FALSE, message=FALSE}
 rqrd <- c("FSA","car","Hmisc","Kendall","lsmeans","multcomp","nlstools","plotrix")
 library(FSA)          # fitPlot, Subset
 library(NCStats)      # addSigLetters
@@ -48,20 +53,26 @@ library(plotrix)      # thigmophobe.labels, rescale
 ```
 
 In addition, external tab-delimited text files are used to hold the data required for each example.  These data are loaded into R in each example with `read.table()`.  Before using `read.table()` the working directory of R must be set to where these files are located on **your** computer.  The working directory for all data files on **my** computer is set below.
-```{r setwd, eval=FALSE}
+```{r eval=FALSE}
 setwd("c:/aaaWork/web/fishR/BookVignettes/AIFFD/")
 ```
 
 In addition, I prefer to not show significance stars for hypothesis test output, reduce the margins on plots, alter the axis label positions, and reduce the axis tick length.  In addition, contrasts are set in such a manner as to force R output to match SAS output for linear model summaries.  All of these options are set below.
-```{r R.options}
+```{r}
 options(width=90,continue=" ",show.signif.stars=FALSE,contrasts=c("contr.sum","contr.poly"))
 par(mar=c(3.5,3.5,1,1),mgp=c(2.1,0.4,0),tcl=-0.2)
 ```
 
+Finally, I set the random number seed so that the boostrapping results can be repeated.
+```{r}
+set.seed(983452)
+```
+
+
 --------------------------------------------------------------
 
 ## Log-Linear Model to Test for Year-Class Abundance Differences
-Below we conduct a test for year-class abundance differences among the 1990 to 1997 year-classes (`yearcl`) based on catch rates of age-0, age-1, and age-2 crappies (*Pomoxis* spp.) (`age` in years) from Weiss Lake (Table 4.1 in text).  Trap-net catch rates (`catch`) were transformed to natural log values to homogenize variances as recommended by [@Kimura1988] for log-linear analysis.  The data in Table 4.1 were rearranged to conduct the analysis.  Year of collection (`yearcol`) was included in the data file, and the following R code was used to conduct the analysis.
+Below we conduct a test for year-class abundance differences among the 1990 to 1997 year-classes (`yearcl`) based on catch rates of age-0, age-1, and age-2 crappies (*Pomoxis* spp.) (`age` in years) from Weiss Lake (Table 4.1 in text).  Trap-net catch rates (`catch`) were transformed to natural log values to homogenize variances as recommended by @Kimura1988 for log-linear analysis.  The data in Table 4.1 were rearranged to conduct the analysis.  Year of collection (`yearcol`) was included in the data file, and the following R code was used to conduct the analysis.
 
 ###Preparing Data
 The `box4_1.txt` is read, the structure of the data frame is observed, and a new variable, `lcatch`, that is the natural log of the catch variable is created.
@@ -100,7 +111,7 @@ lsmeans(lm1,~yearcl)
 The authors of Box 4.1 use Fisher's LSD multiple comparison procedure.  In general, this procedure does not guard well against an inflated experimentwise error rate.  In general, Tukey's HSD procedure performs better in this regard and will be illustrated below.
 
 Tukey's multiple comparison procedure, implemented through `glht()` from the `multcomp` package, can be used to identify where the differences in means occur.  The `glht()` function requires the `lm()` object as the first argument.  The second argument is also required and uses `mcp()` to declare a "multiple comparison procedure."  In this instance the argument to `mcp()` is the factor variable in the `lm()` object for which you are testing for differences set equal to the `"Tukey"` string.  The result from `glht()` is saved to an object that can be submitted to `summary()` to extract p-values for each difference in pairs of means, to `confint()` to extract confidence intervals for each difference in pairs of means, and to `cld()` to identify significance letters that depict significant differences among means.
-```{r}
+```{r cache=TRUE}
 mc1a <- glht(lm1,mcp(age="Tukey"))
 summary(mc1a)
 mc1yc <- glht(lm1,mcp(yearcl="Tukey"))
@@ -117,7 +128,7 @@ addSigLetters(lm1,which="yearcl",lets=c("c","a","ab","bc","bc","ab","c","ab"),
 
 
 ## Evaluation of Time Series Trends in Recruit Abundance
-The following code presents a plot and computes the Pearson correlation coefficient between age-0 C/f (`age0cpe`) of white bass (*Morone chrysops*) and year and the Kendall tau-b non-parametric correlation coefficient for ranks between these two variables (data published in [@Madenjianetal2000]).  In addition, the simple linear regression between C/f and year was computed along with the Durbin-Watson statistic to determine temporal autocorrelation.  Finally, the residuals from the regression were plotted against year.
+The following code presents a plot and computes the Pearson correlation coefficient between age-0 C/f (`age0cpe`) of white bass (*Morone chrysops*) and year and the Kendall tau-b non-parametric correlation coefficient for ranks between these two variables (data published in @Madenjianetal2000).  In addition, the simple linear regression between C/f and year was computed along with the Durbin-Watson statistic to determine temporal autocorrelation.  Finally, the residuals from the regression were plotted against year.
 
 ###Preparing Data
 The `box4_2.txt` data file is read and the structure of the data frame is observed below.  It appears that the authors of Box 4.2 only used years from 1972-1997 in Box 4.2 even though the data provided on the CD with the AIFFD book is for 1969-1997.  Thus, a new data frame, called `d1`, restricted to years after 1971 is created with `Subset()` from the `FSA` package, with the original data frame as the first argument and a conditional statement from which to create the subset as the second argument.  Note that `Subset()` is very similar to `subset()` from base R with the exception that `Subset()` will remove unused levels from a factor variable after the subsetting.  This feature is useful in many situations but is irrelevant in this situation as the subsetting is conducted on a non-factor variable.
@@ -209,5 +220,471 @@ lines(pCPE~d2a$year,lwd=2,col="red")
 ```
 
 
+## Evaluation of Spatial Differences in Recruit Abundance
+Table 4.2 (in text) contains a data set to test for spatial differences in age-0 largemouth bass (*Micropterus salmoides*) catch in Lake Normandy, Tennessee (data from @SammonsBettoli2000).  In this example, four distinct areas of the reservoir (Lower Basin [LB], Riley Creek [RC], Upper Basin [UB], and Carroll Creek [CC]) were chosen to examine spatial variation in abundance of fish along 100-m shoreline electrofishing transects.  A handheld DC electrofishing unit was used at night.  Six fixed sites, or replicate transects, were chosen within each area and sampled three times at 2-week intervals starting the second week of August 1992 and ending the second week of September 1992.  Thus, 24 transects were conducted over three time intervals for a total of 72 transects, or observations.
+
+Because replicate samples were collected at fixed locations over the three time periods within each of the same areas, a split-plot repeated-measured ANOVA was used to test for differences in number of fish among areas [@Maceinaetal1994].  In addition, this analysis also tested for differences in catch over time and examined the time x area interaction. The code and analysis were divided into main-plot A, which included the class variables `area`, replicates (`rep`), and the `area x rep` interaction, and subplot B, which contained the `time` and the `time x area` interaction effects.  The mean square error (MS, or type III sums of squares) of the `area x rep` term was used as the error term in the denominator and the MS error for `area` as the numerator of an F-test to determine if statistical differences in the number caught among the four areas in main-plot A.  The MS error generated from the entire ANOVA was used in the denominator of the F-test to determine if statistical differences in `catch` occurred over the three time periods (subplot B), as well as for testing for any interaction between time periods and areas (subplot B).
+
+The following R code provides output to test for differences in catch among areas.
+
+### Preparing Data
+The `box4_3.txt` data file is read and the structure of the data frame is observed below.  The `rep` and `time` variables are converted to group factor variables for the analysis.
+
+```{r}
+d3 <- read.table("data/box4_3.txt",header=TRUE)
+str(d3)
+d3$rep <- factor(d3$rep)
+d3$time <- factor(d3$time)
+```
+
+
+### Helper Function
+As is demonstrated in Box 4.3 the error term for the "plot" term uses the error term associated with the "plot" and "treatment" interaction term.  As far as I know R does not have a built-in function for computing F-tests with other than the residual or error MS from the full model fit.  Thus, the ANOVA table for these terms must be built by hand by extracting the appropriate MS and df from the Type-III ANOVA table.  This hand calculation is simply finding the appropriate values in the ANOVA table using numerical and named subscripts.  The following function is a helper function that does the "hand" calculations to create the appropriate F-tests.  It should be noted that this function only works if the "plot" and "treatment" are the first two terms in the model and their interactions is the third term.  Fitting models in that order is demonstrated below.
+```{r}
+rmsp2 <- function(object,type=c("III","II","I")) {
+  type <- match.arg(type)
+  # extract df and SS of appropriate rows of ANOVA table
+  if (type=="I") { res <- anova(object)[1:2,1:3] }
+    else if (type=="III") { res <- Anova(object,type=type)[2:4,2:1] }
+      else { res <- Anova(object,type=type)[1:3,2:1] }
+  # compute MSs
+  res[,"Mean Sq"] <- res[,2]/res[,1]
+  # MS in third position is the error MS
+  errorMS <- res[3,"Mean Sq"]
+  # compute F for first two positions (put NA in last position)
+  res[,"F"] <- c(res[1:2,"Mean Sq"]/errorMS,NA)
+  # convert Fs to p-values
+  res[,"PR(>F)"] <- c(pf(res[1:2,"F"],res[1:2,"Df"],res[3,"Df"],lower.tail=FALSE),NA)  
+  res
+}
+```
+
+### Fitting The Model
+The repeated-measures split-plot ANOVA can be fit using `lm()` with a twist.  The twist is that `terms()` must be used to control the order that the model terms will be fit.  This is important because the "plot" and "treatment" terms must be fit first followed by their interaction and then followed by the subplot terms.  This function basically has the explicit model formula as the first argument and then the `keep.order=TRUE` argument so that R does not put all of the interactions terms at the end of the model formula.  The ANOVA table to match the output in Box 4.3 uses `Anova()` and `type="II"` (despite the fact that the table in Box 4.3 is listed as having used type-III SS).
+```{r}
+lm1 <- lm(terms(count~area+rep+area*rep+time+time*area,keep.order=TRUE),data=d3)
+Anova(lm1,type="II")
+```
+
+The hypothesis tests that use the `area:rep` mean square as the error term are then computed with the `rsmp2()` helper function defined above.
+```{r}
+rmsp2(lm1)
+```
+
+### Multiple Comparisons
+The authors of Box 4.3 use the Student-Newman-Keuls' (SNK) multiple comparison procedure.  The SNK method can provide more power than Tukey's HSD method but it tends not to control the experimentwise error rate at the desired level and, because it works in a sequential fashion, it does not produce appropriate confidence intervals (see [this](http://www.graphpad.com/faq/viewfaq.cfm?faq=1093) and Hsu (1996)).  Thus, in general, Tukey's HSD procedure performs better than SNK and will be illustrated below.
+
+Tukey's multiple comparison procedure is implemented with `glht()` as described in Box 4.1.  In this example, the model was refit without the `time:area` interaction because this term was insignificant as shown in the analysis above and its inclusion in the model causes problems when examining the multiple comparison procedures for just time.  Following the model refit below, the remaining commands below tell R to perform a Tukey multiple comparison procedure test on the `time` variable in the `lm1` model.
+```{r}
+lm1a <- lm(terms(count~area+rep+area*rep+time,keep.order=TRUE),data=d3)
+mc1 <- glht(lm1a,mcp(time="Tukey"))
+summary(mc1)
+cld(mc1)
+```
+
+I have not yet figured out how to perform the multiple comparisons using an error term other than the residual or error MS.
+
+
+
+## The Use of Catch-Curve Regression to Identify Weak and Strong Year-Class Formation
+This example contains a data set (data published in @MaceinaBettoli1998) that uses catch-curve regression to detect strong and weak year-class formation in a largemouth bass (*Micropterus salmoides*) population.  In addition, a reservoir hydrologic variable is included that will be used later (see section 4.3.4 in the text) to examine the association between year-class strength and an environmental variable.  In spring 1993, 653 age-2 to age-11 largemouth bass were collected using DC electrofishing.  Age-length keys [@BettoliMiranda2001] were used to estimate the age structure for the entire sample from examination of 190 otoliths.
+
+The R code below first computes the regression between the natural log of number at age (`lnum`) against `age` and uses the predicted values for the natural log of number at age (`plnum`) as weighting factors when the catch-curve analysis was recomputed.  Thus, the second catch-curve regression computes the least-squares fit using the predicted values from the first fit as weights.  From this regression, the residuals were computed and printed with the year-class (`yearcl`) and age identified.  For this analysis, it was assumed that all fish age-2 and older were fully recruited to the electrofishing gear and the fishery.  This analysis is extended in Box 4.6.
+
+### Preparing Data
+The `box4_4.txt` data file is read and the structure of the data frame is observed below.  The authors of Box 4.4 computed the natural log number of fish caught (they also added 1 before taking the logarithm to adjust for catches with zero fish) and the common logarithm [*I am not sure why they switched to common logarithms here*] of the mean retention time between April and July.
+```{r}
+d4 <- read.table("data/box4_4.txt",header=TRUE)
+str(d4)
+d4$lnum <- log(d4$num+1)
+d4$lmeanret <- log10(d4$meanret)
+```
+
+### Catch Curve Analysis I (Estimating Weights)
+The linear regression between `lnum` and `age` (a traditional catch-curve analysis) is fit with `lm()`.  The predicted natural logarithm of number of captured fish at each age are computed and saved to a variable (`plnum1`) in the original data frame for later use.
+```{r}
+lm1 <- lm(lnum~age,data=d4)
+d4$plnum1 <- predict(lm1)
+```
+
+### Catch Curve Analysis II (Using the Weights)
+The linear regression between `lnum` and `age` using `plnum` as weights (a weighted catch-curve analysis) is again fit with `lm()`, but including the `weights=` argument.  The ANOVA table is extracted from the `lm()` object with `anova()` and the parameter estimates are extracted with `summary()` (under the "coefficients" heading), respectively.
+```{r}
+lm2 <- lm(lnum~age,weights=plnum1,data=d4)
+anova(lm2)
+summary(lm2)
+```
+
+### Identifying Year-Class Strength
+Year-class strength is defined in Box 4.4 as the studentized residuals from the weighted catch-curve analysis.  The authors of Box 4.4 created a table that contained, among other things, the predicted values with corresponding standard errors from the weighted catch curve analysis.  These values are computed with `predict()` when given the `lm()` object and `se.fit=FALSE`.  
+```{r}
+( preds <- predict(lm2,se.fit=TRUE) )
+```
+
+These values were then combined with the observed ages, year-class designation, and log numbers of fish at each age, and the raw residuals (`lm2\$residuals`), internally studentized residuals (returned from `rstandard()`), and Cook's distance values (returned from `cooks.distance()`) into a new data.frame using `data.frame()`.
+```{r}
+ycs <- data.frame(age=d4$age, yearcl=d4$yearcl, lnum=d4$lnum, meanret=d4$meanret,
+                  lmeanret=d4$lmeanret, plnum=preds$fit, pse=preds$se.fit,
+                  resid=lm2$residuals, sresid=rstandard(lm2), cooksD=cooks.distance(lm2))
+round(ycs,3)    # rounded for display purposes only
+```
+
+There are two types of "studentized residuals" -- internally and externally studentized (or jackknife) residuals.  SAS appears to produce internally studentized residuals.  The internally studentized residuals are computed in R with `rstandard()` whereas the externally studentized residuals are computed with `rstudent()`.
+
+The graphic in Box 4.4 is a bit cumbersome to construct for a couple of reasons.  First, the values on the x-axis of the plot are in reverse order.  To construct this axis, the observed log numbers of fish are plotted against `age`, but `xaxt="n"` will be used to tell R not to construct an x-axis.  The x-axis will then be added "manually" by placing year-class labels at the tick-marks where the ages would have been.  Second, the vertical lines corresponding to the residuals are constructed manually with a loop.
+```{r}
+plot(lnum~age,data=d4,xlab="Year Class (19__)",xaxt="n", ylab="loge Number-at-Age",pch=19)
+axis(1,at=ycs$age,labels=ycs$yearcl)  # Add 'new' x-axis
+abline(lm2,lwd=2)                     # Add regression line
+for (i in 1:nrow(ycs)) {              # Add residual lines
+  with(ycs,lines(c(age[i],age[i]),c(lnum[i],plnum[i]),lty=2,lwd=2))
+}
+```
+
+There are many other ways to show the year-class strength (i.e., studentized residuals).  The two plots below are examples,
+```{r}
+plot(sresid~yearcl,data=ycs,type="b",xlab="Year Class (19__)", ylab="Studentized Residual",
+     pch=19,ylim=c(-2,2))
+abline(h=0,lty=2)                     # Add horizontal line at 0
+plot(sresid~yearcl,data=ycs,type="h",xlab="Year Class (19__)", ylab="Studentized Residual",
+     pch=19,ylim=c(-2,2),lwd=3)
+abline(h=0,lty=2)
+```
+
+
+
+## Use of Correlation, Simple Regression, and Multiple Regression Analyses to Explain Recruitment Variation
+From the data presented in Table 4.1 (in text), the relations between C/f age-0 crappies (*Pomoxis* spp.) (`cpe0`) and reservoir hydrologic conditions were determined.  The respective year-classes (`yearcl`) were also noted.  The following R code plots bivariate relations between C/f of age-0 fish and hydrologic variables, computes the Pearson product moment correlation coefficients among age-0 catch and the reservoir hydrologic terms, and finally computes multiple regressions to describe and predict age-0 catch from these hydrologic variables.
+
+### Preparing Data
+The `box4_5.txt` data file is read and the structure of the data frame and the data frame is observed below.
+```{r}
+d5 <- read.table("data/box4_5.txt",header=TRUE)
+str(d5)
+d5
+```
+
+### Summary Statistics and Plots
+The summary statistics table is computed with `Summarize()`.  One can use `lapply()` as shown below to compute the summary statistics for each variable in a data frame (NOTE: I excluded the `yearcl` and `cpe1` variables from the data frame for these summaries).
+```{r}
+lapply(as.list(d5[,-c(1,3)]),Summarize,digits=4)
+```
+
+The most efficient way to construct the plots described in Box 4.5 is with `pairs()`.  The `pairs()` function requires a formula as its first argument which must start with a tilde followed by the apparent summation of all numeric variables.  The data frame in which the variables are found is included in the `data=` argument.
+```{r fig.height=5, fig.width=5}
+pairs(~cpe0+winstage+winret+sprstage,data=d5,pch=19)
+```
+
+From this analysis it appears that the CPE of age-0 fish is highly linearly related to mean winter stage level and mean winter retention (though, this may be curvilinear) and rather weakly related to mean spring stage (though, two potential outliers are evident).  In addition, mean winter stage level and mean winter retention appear to be highly negatively correlated (though, potentially curvilinear).
+
+### Correlation Analysis
+The authors examined the correlations, with p-values corresponding to a test of whether the correlation is equal to zero, between all variables.  This computation is accomplished with `rcorr()` as described in Box 4.2.
+```{r}
+rcorr(as.matrix(d5[,c("cpe0","winstage","winret","sprstage")]))
+```
+
+### Multiple Linear Regressions
+The multiple linear regression with three explanatory variables is fit with `lm()` and saved to an object. The parameter estimates and overall F test statistic are extracted from the saved linear model with `summary()`. The variance-inflation-factors (VIFs) are extracted with `vif()` from the `car` package.  The large VIFs are not surprising given the high correlation observed between `winstage` and `winret`.
+
+```{r}
+lm1 <- lm(cpe0~winstage+winret+sprstage,data=d5)
+summary(lm1)
+vif(lm1)
+```
+
+As the authors of Box 4.5 suggest, `winret` is excluded from the analysis as it was highly correlated with `winstage` but `winstage` was more highly correlated with `cpe0`.
+```{r}
+lm2 <- lm(cpe0~winstage+sprstage,data=d5)
+summary(lm2)
+```
+
+Finally, the simple linear regression with just `winstage` is fit.
+```{r}
+lm3 <- lm(cpe0~winstage,data=d5)
+summary(lm3)
+```
+
+### Final Plot
+The plot at the end of Box 4.5 can be constructed in parts.  The initial plot is constructed with `plot()` as usual.  Year-class labels for each point are added with `thigmophobe.labels()` from the `plotrix` package which takes the x- and y-coordinates as the first two arguments and the labels as the third argument.  I subtracted 1900 from each value in the `yearcl` variable so that only the two-digit year would be printed.  The `thigmophobe.labels()` function positions the labels in a manner that reduces the chances of label overlap.  The two uses of `abline()` are used to add a vertical line at the "Full Summer Pool" value and the best-fit line from the regression of age-0 CPE on mean winter stage.
+```{r}
+plot(cpe0~winstage,data=d5,pch=19,xlim=c(170.5,172),ylim=c(0,12),
+     xlab="Mean Winter (Jan-Mar) Stage",ylab="Age-0 CPE")
+thigmophobe.labels(d5$winstage,d5$cpe0,d5$yearcl-1900)
+abline(v=171.95,lty=3)
+abline(lm3,lty=2)
+```
+
+
+## Incorporation of an Environmental Term into a Catch-Curve Regression to Explain Fluctuations in Recruitment
+From the data presented in the R code in Box 4.4 and the code below, April-July retention will first be plotted against the residuals from the weighted catch-curve regression for largemouth bass.  Then, this term will be added to the simple linear catch-curve regression to compute a multiple regression.  The mean retention (`meanret`) between April-July corresponds to the hatching and post-hatching time period for each year-class when fish were age-0 [@Maceinaetal1995a].
+
+The same data and `ycs` data frame from Box 4.4 are used here.
+
+### Relating Year-Class Strength to Mean Retention Time (Box 4.6)
+The plot of the residuals versus mean retention time (left) and log mean retention time (right) is constructed below.  There is a clear curvilinear pattern evident in the raw residuals plot but not in the transformed plot (though a heteroscedasticity is evident).  The relatively strong relationship between the residuals from the catch curve model and the log mean retention time suggests that including log mean retention time in the catch curve model may explain a significant portion of the remaining unexplained variability.  This term is included in the analysis further below.
+
+```{r}
+plot(resid~meanret,data=ycs,pch=19,xlab="Mean Retention Time", ylab="Residual")
+abline(h=0,lty=2)
+plot(resid~lmeanret,data=ycs,pch=19,xlab="log10 Mean Retention Time", ylab="Residual")
+abline(h=0,lty=2)
+```
+
+The multiple linear regression with the `lmeanret` variable is computed with `lm()` by "adding" the `lmeanret` to the original weighted catch curve model.
+```{r}
+lm3 <- lm(lnum~age+lmeanret,weights=plnum1,data=d4)
+summary(lm3)
+```
+
+The summary statistics and correlation analyses shown in Box 4.6 are constructed with
+```{r}
+Summarize(ycs$resid,digits=4)
+Summarize(ycs$meanret,digits=4)
+rcorr(cbind(ycs$resid,d4$meanret))
+```
+
+
+
+## Computation of the Beverton-Holt Recruit-Spawning Curve
+From 1991 to 1996, crappies (*Pomoxis* spp.) were collected from three Alabama reservoirs (`lake`) that displayed similar hydrologic conditions (data from @Ozen1997); 16 to 20 trap nets were used as described in Box 4.1.  Fish were collected in the fall of each year, aged, and weighed (within 1 g). The variable `spawner` was determined by dividing total weight of all age-2 and older crappies (assumed to be adults) by the number of net-nights of effort and `recruit` was determined by dividing the total number of age-0 crappies by the number of net-nights of effort.  The code below plots the relation between recruits and spawners, then describes the relations between recruits and spawners using nonlinear regression for untransformed and natural log transformed data (equations [4.3] and [4.5] in the text, respectively).  From the last nonlinear regression, predicted recruits (`pred.lrec`) was regressed against observed recruits to provide additional statistical inference.  The predicted number of recruits and associated residuals from the last nonlinear regression were derived and printed.  In the nonlinear procedure in R, the parameters statement refers to approximate coefficients for $\alpha$ (a in R) and $\beta$ (b in R) in the nonlinear regression that are provided by the fisheries scientist to initiate the analysis.  Hougaard's skewness values for $\alpha$ and $\beta$ were computed for each nonlinear regression.  Finally, residual values from the last nonlinear regression were summed.
+
+### Preparing Data
+The `box4_7.txt` data file is read and the structure of the data frame is observed below.  In addition, the authors of Box 4.7 created a new variable that contains the natural log of the number of recruits.
+```{r}
+d7 <- read.table("data/box4_7.txt",header=TRUE)
+str(d7)
+d7$lrecruit <- log(d7$recruit)
+```
+
+### Plot of Stock-Recruit Data
+The plot, mentioned but not shown in Box 4.7, is constructed as shown below.
+```{r}
+plot(recruit~spawner,data=d7,ylab="Catch Rate of Age-0 Crappie",
+     xlab="Biomass of Age-2+ Crappie",pch=19)
+```
+
+### Non-Linear Model Fit with Additive Errors (i.e., Raw Data)
+The non-linear model fitting procedure in R is implemented with `nls()`, which requires the model formula, the list of starting values, and the data frame containing the variables as arguments.  In addition, `trace=TRUE` can be included in `nls()` to see the residual sum-of-squares and current values of the parameters for each iteration of the fitting process.  For simplicity and clarity, the starting values can be entered into a list and the formula corresponding to the Beverton-Holt stock-recruit model are created prior to calling `nls()`.  The parameter estimates and correlation among parameters are extracted from the saved `nls()` object with `overview()` from the `nlstools` package.
+```{r}
+bhst <- list(a=0.03,b=0.002)                     # list of starting values
+bhsr <- recruit~(a*spawner)/(1+b*spawner)        # B-H model as an R formula
+nls1 <- nls(bhsr,data=d7,start=bhst,trace=TRUE)
+overview(nls1)
+```
+
+### Non-Linear Model Fit with Multiplicative Errors (i.e., Log Transformed Data)
+The Beverton-Holt model with multiplicative errors is fit similarly with the only major adjustment being that the both sides of the model are log-transformed.
+```{r}
+bhst2 <- list(a=0.01,b=0.002)
+bhsr2 <- lrecruit~log((a*spawner)/(1+b*spawner))
+nls2 <- nls(bhsr2,data=d7,start=bhst2)
+overview(nls2)
+```
+
+### Bootstrapping Confidence Intervals
+The `nlsBoot()` from the `nlstools` package is used to bootstrap the residuals from a non-linear model fit.  This function only requires the model as an argument, but the number of bootstrap samples can be controlled with the `niter=` argument.  The mean parameter values and confidence intervals are constructed from the saved `nlsBoot` object using `summary()`.
+```{r warning=FALSE, cache=FALSE}
+bhbc <- nlsBoot(nls2,niter=2000)
+summary(bhbc)
+```
+
+### Diagnostics
+The predicted number of log recruits from the multiplicative errors model is computed with `fitted()` and the residuals are computed with `residuals()`.  These two items are appended to the data frame and the residuals are summed below.
+```{r}
+d7$pred.lrec <- fitted(nls2)
+d7$res.lrec <- residuals(nls2)
+d7
+sum(d7$res.lrec)
+```
+
+The simple linear regression of the predicted number of log recruits on the observed number of log recruits is fit and the anova table and coefficients are extracted below.
+```{r}
+lm1 <- lm(pred.lrec~lrecruit,data=d7)
+anova(lm1)
+summary(lm1)
+```
+
+### Final Fitted Plot
+Finally, a plot that shows the raw data with fitted lines from the two non-linear fits can be constructed as shown below.  In this code, a plot of the data is constructed first, the coefficients of the first model are extracted with `coef()` and saved, and those coefficients are used in `curve()` to add the model curve on to the plot.  This is repeated for the second model and a legend is added in the top-left corner of the plot.
+```{r}
+plot(recruit~spawner,data=d7,pch=19)
+cnls1 <- coef(nls1)
+curve((cnls1[1]*x)/(1+cnls1[2]*x),from=min(d7$spawner),to=max(d7$spawner),col="red",
+      lwd=2,lty=2,add=TRUE)
+cnls2 <- coef(nls2)
+curve((cnls2[1]*x)/(1+cnls2[2]*x),from=min(d7$spawner),to=max(d7$spawner),col="blue",
+      lwd=2,lty=2,add=TRUE)
+legend("topleft",legend=c("Additive Error","Multiplicative Error"),col=c("red","blue"),
+       lwd=2,lty=2,cex=0.5)
+```
+
+
+## Computation of Ricker Recruit-Spawner Curves with the Inclusion of an Environmental Term to Explain Recruit Variation
+Population estimates for age-5 and older adult walleye (*Sander vitreus*) (spawner) and age-0 walleye (recruit) were made in Escanaba Lake, Wisconsin, from 1958 to 1991 (data from @Hansenetal1998; see Table 4.3 in text).  The following R code computes a nonlinear regression to describe the relation between recruits and spawners assuming lognormal error structure (equation [4.6] in text).  From this regression, predicted recruits are regressed against observed recruits to provide additional statistical inference.  Next the program computes the Ricker recruit-spawner relation (equation [4.7] in text) using linear regression.  The corrected coefficient of determination and associated F-statistic was given by regressing predicted recruits against observed recruits.  Finally, the program also computes the nonlinear regression with lognormal error structure in the recruit-spawner relation to include the variation in May air temperature (`mtempcv`) as an additional regressor of walleye recruits (equation [4.9] in text modified to include lognormal error structure).
+
+### Preparing Data
+The `box4_8.txt` data file is read and the structure of the data frame is observed below.  The analyses below require a variable that is the natural log of the number of recruits, natural log of the number of spawners, the ratio of recruits to spawners, and the log of this ratio.  These variables are created and added to the data frame. 
+```{r}
+d8 <- read.table("data/box4_8.txt",header=TRUE)
+str(d8)
+d8$logR <- log(d8$recruit)
+d8$logS <- log(d8$spawner)
+d8$ratio <- d8$recruit/d8$spawner
+d8$lratio <- log(d8$ratio)
+view(d8)
+```
+
+### Plot of Stock-Recruit Data
+I wanted to visualize the stock-recruit relationship before fitting any models in two different ways.  I first plotted the stock-recruit plot with year labels next to each point.  The year labels for each point are added with `thigmophobe.labels()` as described in Box 4.5.  I then plotted the stock-recruit plot but with the size of each plotted point relative to the value of the `mtempcv` variable.  This plotting requires use of the "character expansion" (i.e., `cex=`) argument in `plot()`.  The default character size is 1 such that, for example, a `cex=2` value would produce a point twice as big as typical.  I rescaled (with `rescale()` from the `plotrix` package) the `mtempcv` variable to take values between 0.5 and 2 so that relatively small values of `mtempcv` would produce smaller points and relatively larger values of `mtempcv` would produce larger points.  It is apparent from these plots that the stock-recruit relationship is weak and that there may be a very weak relationship with the variation in May temperatures (it seems that lower recruitment may correspond to higher temperature variability).
+
+```{r}
+plot(recruit~spawner,data=d8,ylab="Number of Age-0 Walleye",
+     xlab="Number of Age-5 Walleye",pch=19)
+with(d8,thigmophobe.labels(spawner,recruit,labels=year-1900))
+plot(recruit~spawner,data=d8,ylab="Number of Age-0 Walleye",
+     xlab="Number of Age-5 Walleye",pch=19,cex=rescale(mtempcv,c(0.5,2)))
+```
+
+### Ricker Model - Nonlinear Regression with Multiplicative Errors
+The non-linear model fitting procedure in R is implemented with `nls()` as described in Box 4.7.  The model is fit with multiplicative errors if both the sides of the formula are log-transformed.
+```{r}
+rst <- list(a=4,b=0)                           # Starting values
+rsr <- logR~log(spawner*exp(a+b*spawner))      # Ricker model as an R formula
+nls1 <- nls(rsr,data=d8,start=rst,trace=TRUE)
+overview(nls1)
+```
+The predicted number of log recruits and the residuals from the multiplicative errors model are appended to the original data frame and the sum of the residuals is shown to be equal to zero.
+```{r}
+d8$pred1.lrec <- fitted(nls1)
+d8$res1.lrec <- residuals(nls1)
+sum(d8$res1.lrec)
+```
+The simple linear regression of the predicted number of log recruits on the observed number of log recruits is fit with `lm()` and `summary()` is used to extract the model coefficients and, as illustrated in the box, the $R^{2}$ value for the non-linear model fit.
+```{r}
+lm1 <- lm(pred1.lrec~logR,data=d8)
+summary(lm1)
+```
+
+### Ricker Model -- Linear Regression
+The Ricker model can be linearized via transformation as described in the AIFFD book.  This linearized version of the model is fit and summarized below.  The predicted number of log recruits from the linear model is a bit more difficult to obtain because this model predicts the log ratio of recruits to spawners.  Thus, these predictions should be back-transformed to the original scale (i.e., the ratio), multiplied by the number of spawners to get the predicted number of recruits, and then logged to get the predicted log number of recruits.  This process of computing predicted log number of recruits is shown below followed by the regression of  of these predictions on the observed log recruits and the summary of that model fit.
+```{r}
+lm2 <- lm(lratio~spawner,data=d8)
+summary(lm2)
+d8$pred2.lrec <- log(exp(fitted(lm2))*d8$spawner)
+lm2a <- lm(pred2.lrec~logR,data=d8)
+summary(lm2a)
+```
+
+### Ricker Model with Environmental Component - Nonlinear Regression with Lognormal Errors
+In this analysis the authors return to the original nonlinear model but include the variation in May temperatures variable (i.e., `mtempcv`) as another potential prediction of the number of recruits.  The model fit and summary extraction is essential as before with the exception that there is an additional variable and parameter in the model.
+```{r}
+rst2 <- list(a=4,b=0,c=-7)
+rsr2 <- logR~log(spawner*exp(a+b*spawner+c*mtempcv))
+nls2 <- nls(rsr2,data=d8,start=rst2,trace=TRUE)
+overview(nls2)
+d8$pred3.lrec <- fitted(nls2)
+d8$res3.lrec <- residuals(nls2)
+sum(d8$res2.lrec)
+lm4 <- lm(pred3.lrec~logR,data=d8)
+summary(lm4)
+```
+
+The relative significance of the `mtempcv` variable can be assessed by computing the SS explained by using model `nls2` as compared to `nls1` (this is the idea suggested by the authors of Box 4.8 when they mention @MontgomeryPeck1982).  This comparison is constructed in R by submitting these two non-`lm()` objects to `anova()`.
+```{r}
+anova(nls1,nls2)
+```
+In addition, the model with the lowest AIC value is the "best" model.  The AICs for both models are extracted by submitting the two non-linear models to `nls()`.
+```{r}
+AIC(nls1,nls2)
+```
+
+### Final Fitted Plot
+Finally, a plot that shows the raw data with fitted lines from the non-linear fits without the environmental variable and assuming multiplicative (i.e., `nls1`) and additive (computed below) errors is constructed below.  This code follows the same concept as that described at the end of Box 4.7.
+```{r}
+rsr3 <- recruit~spawner*exp(a+b*spawner)
+nls3 <- nls(rsr3,data=d8,start=rst)
+plot(recruit~spawner,data=d8,pch=19,xlim=c(0,max(d8$spawner)))
+cnls1 <- coef(nls1)
+curve(x*exp(cnls1[1]+cnls1[2]*x),from=0,to=max(d8$spawner),col="red",lwd=2,lty=2,add=TRUE)
+cnls3 <- coef(nls3)
+curve(x*exp(cnls3[1]+cnls3[2]*x),from=0,to=max(d8$spawner),col="blue",lwd=2,lty=2,add=TRUE)
+legend("topright",legend=c("Multiplicative Error","Additive Error"),col=c("red","blue"),
+       lwd=2,lty=2,cex=0.5)
+```
+
+
+## Computation of Bootstrapped Parameter Estimates for the Ricker Recruit-Spawner Curve
+The R code below conducts bootstrapped parameter estimation for walleye (*Sander vitreus*) recruit-spawner data (recruits given as `recruit`, spawners given as `spawner`) listed in Table 4.3 (in text).  The code uses the nonlinear form of the Ricker recruit-spawner relation and incorporates lognormal error structure (equation [4.6] in text). In total, 500 estimates were generated.
+
+The same data used in Box 4.8 is used in this section.
+
+### Ricker Model - Nonlinear Regression with Multiplicative Errors
+The Ricker model with multiplicative errors was fit in Box 4.8.  This fitting is repeated below but the specific description of the methodology is not repeated.
+```{r}
+d8$logR <- log(d8$recruit)
+rst <- list(a=4,b=0)
+rsr <- logR~log(spawner*exp(a-b*spawner))
+nls1 <- nls(rsr,data=d8,start=rst)
+overview(nls1)
+```
+
+### Bootstrapping - Basic Analyses
+The `nlsBoot()` function as described in Box 4.7 is used to bootstrap the residuals from a non-linear model fit.  The `summary()` function can be used to extract the median values and 95% confidence intervals for each parameter from the bootstrap samples by submitting just the `nlsBoot` object.  The `confint()` function extracts just the confidence intervals for each parameter and allows the user to choose a level of confidence with the optional `conf.level=` argument.
+```{r}
+rbc <- nlsBoot(nls1,niter=2000)
+summary(rbc)
+confint(rbc)                  # default 95% CI
+confint(rbc,conf.level=0.9)   # illustrative 90% CI
+```
+
+### Bootstrapping - Further Analyses
+The parameter estimates for each bootstrap sample are contained in the `coefboot` matrix object of the saved `nlsBoot()` object as illustrated below.
+```{r}
+str(rbc)
+view(rbc$coefboot)
+```
+
+Thus, the parameter values from each bootstrap sample can be accessed in order to form a variety of summaries.  These values are slightly easier to access if the `coefboot` object in the `nlsboot` object is saved as a data frame using `as.data.frame()`.  With this, the summary statistics for a parameter are found with `summary()` and one-sample t-tests of whether the bootstrapped mean of the parameter equals zero or not is computer with `t.test()`.
+```{r}
+rbc.d <- as.data.frame(rbc$coefboot)
+Summarize(rbc.d$a)
+Summarize(rbc.d$b)
+t.test(rbc.d$a)
+t.test(rbc.d$b)
+```
+
+The quantiles presented in Box 4.9 are constructed with `quantile()` include the vector of probabilities in the `probs=` argument.
+```{r}
+quantile(rbc.d$a,probs=c(0,1,5,10,25,50,75,90,95,99,100)/100)
+quantile(rbc.d$b,probs=c(0,1,5,10,25,50,75,90,95,99,100)/100)
+```
+
+Histograms, with some modifications, of a set of parameter estimates is created with `hist()`.
+```{r}
+hist(rbc.d$a,xlab="Bootstrap Estimates of a",main="")
+abline(v=coef(nls1)["a"],lty=2,lwd=2,col="red")       # put nls estimate on hist
+abline(v=confint(rbc)["a",],lty=3,col="blue")         #   and bootstrap CIs
+hist(rbc.d$b,xlab="Bootstrap Estimates of b",main="")
+abline(v=coef(nls1)["b"],lty=2,lwd=2,col="red")       # put nls estimate on hist
+abline(v=confint(rbc)["b",],lty=3,col="blue")         #   and bootstrap CIs
+```
+
+Finally, simply submitting the `nlsBoot` object to `plot` will produce a scatterplot of each pair of parameters from all bootstrap samples.
+```{r}
+plot(rbc)
+```
 
 --------------------------------------------------------------
+
+```{r echo=FALSE, results='markup'}
+et <- proc.time() - stime
+reproInfo(rqrdPkgs=rqrd,newPage=FALSE,elapsed=et["user.self"]+et["sys.self"])
+```
+
+```{r echo=FALSE, results='hide', message=FALSE}
+purl2("Chapter4.Rmd",moreItems=c("source","rqrd","stime"))    # Will create the script file
+```
+
+
+--------------------------------------------------------------
+# References
