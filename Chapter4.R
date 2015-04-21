@@ -1,6 +1,3 @@
-library(knitr)          # knitr options -- output look
-opts_chunk$set(prompt=TRUE,comment='  ')
-
 library(FSA)          # fitPlot, Subset
 library(NCStats)      # addSigLetters
 library(car)          # Anova, durbinWatsonTest, vif
@@ -11,10 +8,9 @@ library(multcomp)     # glht, mcp, cld
 library(nlstools)     # overview, nlsBoot
 library(plotrix)      # thigmophobe.labels, rescale
 
-   setwd("c:/aaaWork/web/fishR/BookVignettes/AIFFD/")
+setwd("c:/aaaWork/web/fishR/BookVignettes/AIFFD/")
 
-options(width=90,continue=" ",show.signif.stars=FALSE,contrasts=c("contr.sum","contr.poly"))
-par(mar=c(3.5,3.5,1,1),mgp=c(2.1,0.4,0),tcl=-0.2)
+options(show.signif.stars=FALSE,contrasts=c("contr.sum","contr.poly"))
 
 set.seed(983452)
 
@@ -174,7 +170,7 @@ summary(lm3)
 
 plot(cpe0~winstage,data=d5,pch=19,xlim=c(170.5,172),ylim=c(0,12),
      xlab="Mean Winter (Jan-Mar) Stage",ylab="Age-0 CPE")
-thigmophobe.labels(d5$winstage,d5$cpe0,d5$yearcl-1900)
+thigmophobe.labels(d5$winstage,d5$cpe0,d5$yearcl-1900,cex=0.8)
 abline(v=171.95,lty=3)
 abline(lm3,lty=2)
 
@@ -237,9 +233,10 @@ d8$ratio <- d8$recruit/d8$spawner
 d8$lratio <- log(d8$ratio)
 view(d8)
 
+par(mar=c(3.3,3.5,0.4,0.2),mgp=c(2.35,0.3,0))
 plot(recruit~spawner,data=d8,ylab="Number of Age-0 Walleye",
      xlab="Number of Age-5 Walleye",pch=19)
-with(d8,thigmophobe.labels(spawner,recruit,labels=year-1900))
+with(d8,thigmophobe.labels(spawner,recruit,labels=year-1900,cex=0.8))
 plot(recruit~spawner,data=d8,ylab="Number of Age-0 Walleye",
      xlab="Number of Age-5 Walleye",pch=19,cex=rescale(mtempcv,c(0.5,2)))
 
@@ -275,6 +272,7 @@ anova(nls1,nls2)
 
 AIC(nls1,nls2)
 
+par(mar=c(3.3,3.5,0.4,0.2),mgp=c(2.35,0.3,0))
 rsr3 <- recruit~spawner*exp(a+b*spawner)
 nls3 <- nls(rsr3,data=d8,start=rst)
 plot(recruit~spawner,data=d8,pch=19,xlim=c(0,max(d8$spawner)))
@@ -315,7 +313,8 @@ hist(rbc.d$b,xlab="Bootstrap Estimates of b",main="")
 abline(v=coef(nls1)["b"],lty=2,lwd=2,col="red")       # put nls estimate on hist
 abline(v=confint(rbc)["b",],lty=3,col="blue")         #   and bootstrap CIs
 
+par(mar=c(3.3,3.5,0.4,0.2),mgp=c(2.35,0.3,0))
 plot(rbc)
 
 
-# Script created at 2015-04-20 21:02:48
+# Script created at 2015-04-21 10:27:47
