@@ -1,0 +1,860 @@
+---
+title: "AIFFD Chapter 3 - Sampling and Experimental Design"
+author: "Derek H. Ogle"
+csl: american-fisheries-society.csl
+output:
+  html_document:
+    fig_height: 4.5
+    fig_width: 4.5
+    highlight: tango
+    number_sections: yes
+    pandoc_args: --number-offset=3
+    toc: yes
+    toc_depth: 2
+  pdf_document:
+    fig_height: 3
+    fig_width: 3
+    number_sections: yes
+    pandoc_args: --number-offset=3
+    toc: yes
+    toc_depth: 2
+bibliography: AIFFDReferences.bib
+---
+\setcounter{section}{3}
+
+```{r echo=FALSE, include=FALSE}
+stime <- proc.time()    # Start time to get processing time
+source('knitr_setup.R')
+```
+
+--------------------------------------------------------------
+
+This document contains R versions of the boxed examples from **Chapter 3} of the "Analysis and Interpretation of Freshwater Fisheries Data" book.  Some sections build on descriptions from previous sections, so each section may not stand completely on its own.  More thorough discussions of the following items are available in linked vignettes:
+
+* the use of linear models in R in the linear models section of the [Preliminaries Vignette](https://fishr.wordpress.com/books/aiffd/),
+* differences between and the use of type-I, II, and III sums-of-squares in the [Preliminaries Vignette](https://fishr.wordpress.com/books/aiffd/), and
+* the use of "least-squares means" is found in the [Preliminaries Vignette](https://fishr.wordpress.com/books/aiffd/).
+
+The following additional packages are required to complete all of the examples (with the required functions noted as a comment and also noted in the specific examples below).
+
+```{r pkgs, echo=-1, warning=FALSE, message=FALSE}
+rqrd <- c("FSA","NCStats","arm","car","gdata","languageR","lattice","lme4","lsmeans","nortest","sciplot","survey")
+library(FSA)       # Summarize, fitPlot, binCI, view
+library(NCStats)   # sdCalc
+library(arm)       # se.ranef
+library(car)       # Anova, leveneTest, outlierTest
+library(languageR) # pvals.fnc
+library(lattice)   # bwplot, densityplot
+library(lme4)      # lmer and related extractors
+library(lsmeans)   # lsmeans
+library(nortest)   # ad.test, cvm.test
+library(sciplot)   # se
+library(survey)    # svydesign, svymean
+```
+
+In addition, external tab-delimited text files are used to hold the data required for each example.  These data are loaded into R in each example with `read.table()`.  Before using `read.table()` the working directory of R must be set to where these files are located on **your** computer.  The working directory for all data files on **my** computer is set with
+
+```{r eval=FALSE}
+setwd("c:/aaaWork/web/fishR/BookVignettes/AIFFD/")
+```
+
+I also prefer to not show significance stars for hypothesis test output and set contrasts in such a manner as to force R output to match SAS output for linear model summaries.  These options are set below.
+```{r}
+options(show.signif.stars=FALSE,contrasts=c("contr.sum","contr.poly"))
+```
+
+
+## Example of Estimating the Mean Based on Simple Random Sampling
+Fifteen sites were randomly selected from an X-Y grid superimposed on a shallow lake.  At each site, the catch of central mudminnow (*Umbra limi*) in a throw trap (assumed to be equally efficient at all sites in the lake) was recorded.  The goal of the sampling was to determine the mean density of central mudminnows in the lake.
+
+### Preparing Data
+The [`box3_1.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box3_1.txt) is read and the structure of the data frame is observed.
+```{r}
+d1 <- read.table("data/box3_1.txt",header=TRUE)
+str(d1)
+```
+
+### Compute Summary Statistics
+The mean and standard deviation for the quantitative variable is computed with `Summarize()` from the `FSA` package.  The single required argument is the vector containing the quantitative data.
+```{r}
+Summarize(d1$catch)
+```
+
+If you do not want to load the `FSA` package, then the same calculations are made with `summary()` and `sd()` of the R base packages.
+```{r}
+summary(d1$catch)
+sd(d1$catch)
+```
+
+Regardless of which way you summarize the results, you can compute the standard error with `se()` from the `sciplot` package.
+```{r}
+se(d1$catch)
+```
+
+### Constructing Confidence Intervals for the Population Mean
+The critical t value for computing a confidence interval is found with `qt()`.  This function requires an upper-tail probability (i.e., $\frac{1-C}{2}$ where $C$ is the level of confidence), the degrees-of-freedom (which uses `length()` with the vector of data as the only argument to find $n$), and the `lower.tail=FALSE` argument.
+```{r}
+df <- length(d1$catch)-1             # compute df as n-1
+C <- 0.95                            # set confidence level
+a2 <- (1-C)/2                        # find upper tail probability
+( ct <- qt(a2,df,lower.tail=FALSE) ) # find critical t-value
+```
+
+The two endpoints of the confidence interval can then be calculated with the mean (using `mean()` with the vector of data as the only argument), standard error, and the critical t value.
+```{r}
+( mn <- mean(d1$catch) )              # find (and save) the mean
+( semn <- se(d1$catch) )              # find (and save) the SE of the mean
+( LCI <- mn-ct*semn )
+( UCI <- mn+ct*semn )
+```
+
+The confidence interval, along with a great deal of other information, is computed from the raw data with `t.test()`.  In this simplest form, this function only requires the vector of quantitative data as the first argument and an optional level of confidence, as a proportion, in the `conf.level=` argument (default is 0.95).
+```{r}
+t.test(d1$catch)
+```
+
+### Demonstration of Standard Deviation Calculation
+The intermediate steps in computing a standard deviation, as shown at the beginning of Box 3.1, are demonstrated with `sdCalc()` from the `NCStats` package.
+```{r}
+sdCalc(d1$catch)
+```
+
+
+
+## Example of Estimating a Proportion in Simple Random Sampling
+One hundred sixteen brown trout (*Salmo trutta*) were collected at random from a population in a stream with the goal of estimating the proportion in each age-group.  The age of each fish was estimated from scales.
+
+### Preparing Data
+The [`box3_2.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box3_2.txt) is read and the data frame is observed.
+```{r}
+( d2 <- read.table("data/box3_2.txt",header=TRUE) )
+```
+
+### Compute Proportions in Each Age Group
+The proportions of fish in each age group are computed by dividing the catch in each age group by the total catch.  The total catch is first computed by using `sum()` with the vector of catches as its only argument to sum the catches. 
+```{r}
+ttl <- sum(d2$n)                                      # compute (and save) total catch
+( p <- d2$n/ttl )                                     # find proportion of "successes"
+```
+
+The standard errors are then computed with $\sqrt{\frac{p*(1-p)}{n-1}}$ (note that the text defines $q=1-p$).
+```{r}
+( seps <- sqrt(p*(1-p)/(ttl-1)) )
+```
+
+### Confidence Intervals for Population Proportions I
+The critical value from the F distribution is found with `qf()`.  This function requires an upper-tail probability as the first argument, numerator df as the second argument, denominator df as the third argument, and `lower.tail=FALSE`.  For example, the two critical F values used for **only the first age-group** in Box 3.2 are found below.
+```{r}
+alpha <- 0.05
+n <- ttl
+a <- 55                                              # demonstrate for first group only
+( f.lwr <- qf(alpha,2*(n-a+1),2*a,lower.tail=FALSE) )
+( f.upr <- qf(alpha,2*a+2,2*(n-a+1)-2,lower.tail=FALSE) )
+```
+The CIs for the first age-group can then be computed with the formulas shown in the text.
+```{r}
+( LCI <- a / (a+(n-a+1)*f.lwr) )
+( UCI <- ((a+1)*f.upr)/(n-a+(a+1)*f.upr) )
+```
+
+Vector arithmetic in R can then be used to efficiently compute t CIs for all of the age-groups.
+```{r}
+LCIs <- d2$n/(d2$n+(ttl-d2$n+1)*qf(alpha,2*(ttl-d2$n+1),2*d2$n,lower.tail=FALSE))
+UCIs <- ((d2$n+1)*qf(alpha,2*d2$n+2,2*(ttl-d2$n+1)-2,lower.tail=FALSE))/
+  (ttl-d2$n+(d2$n+1)*qf(alpha,2*d2$n+2,2*(ttl-d2$n+1)-2,lower.tail=FALSE))
+data.frame(age=d2$age,p,seps,LCIs,UCIs)               # put in data frame just to show
+```
+
+### Confidence Intervals for Population Proportions II
+Many authors suggest methods for computing confidence intervals for proportions other than using the F distribution as shown in the text.  One such method is the so-called "Wilson" method which is the default method in `binCI()` from the `FSA` package.  This function requires the "number of success" as the first argument, the "number of trials" as the second argument, and an optional level of confidence as a proportion (defaults to 0.95) in `conf.level=`.
+```{r}
+binCI(d2$n,ttl)
+```
+
+
+
+## Example of Estimating a Ratio in Simple Random Sampling
+Twenty yellow perch (*Perca flavescens*) were randomly sampled from a lake, and weights of zooplankton, benthos, and fish in each yellow perch stomach were measured.  The goal was to determine the ratio of each prey category to total weight of prey in the diet of the yellow perch population.
+
+### Preparing Data
+The [`box3_3.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box3_3.txt) is read, the structure of the data frame, and random rows of the data is observed below.  In addition, the table shown in Box 3.3 and the methods below require a column that consists of the total prey weight.  This column is appended to the data frame and a random six rows of the data frame are observed with `view()` from the `FSA` package to assure that this computation makes sense.
+
+```{r}
+d3 <- read.table("data/box3_3.txt",header=TRUE)
+str(d3)
+d3$ttlW <- d3$Zooplankton + d3$Benthos + d3$Fish
+view(d3)
+```
+
+### Computing the Ratio Estimators
+The ratio estimators can be computed in R with the help of `svydesign()` and `svyratio()`, both of which are from the `survey` package.  The `svydesign()` function is used to identify the design of sample.  In the case of simple random sample as in this example, this function only requires the `id=~1` as the first argument (essentially identifying that each row of the data frame is a randomly sampled primary sampling unit) and the appropriate data frame in `data=`.  The ratio estimate is then computed with `svyratio()` with the variable to serve as the numerator as a "formula" in the first argument, the variable to serve as the denominator as a "formula" in the second argument, the `svydesign()` as the third argument.  The corresponding confidence interval is computed by submitting the saved `svyratio()` object to `confint()`.
+
+```{r}
+srs <- svydesign(id=~1,data=d3)
+( res1 <- svyratio(~Zooplankton,~ttlW,srs) )
+confint(res1)
+```
+
+For efficiency, if the numerator argument is the apparent "sum" of a number of variables, then the ratio estimators will be computed for each of those variables.
+```{r}
+( res2 <- svyratio(~Zooplankton+Benthos+Fish,~ttlW,srs) )
+confint(res2)
+```
+
+> **The "formula" arguments in `svydesign()` MUST begin with a tilde.**
+
+
+## Example of Stratified Random Sampling
+A grid was superimposed on the map of a shallow lake, and all grid cells were classified as being in one of three depth strata (0-2m, 2-4m, >4m).  Ten grid cells were sampled in each depth stratum, and at each site the catch of age-0 yellow perch (*Perca flavescens*) in a throw trap (assumed to be equally efficient at all sites in the lake) was recorded.  The goal of the sampling program was to estimate the mean density of age-0 yellow perch.
+
+### Preparing Data
+The [`box3_4.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box3_4.txt) is read, the structure of the data frame, and six random rows of the data are observed below.  Note that `cells` contains the number of grid cells in each stratum and this value is repeated for each row of a particular stratum.
+
+```{r}
+d4 <- read.table("data/box3_4.txt",header=TRUE)
+str(d4)
+view(d4)
+```
+
+### Computing Mean Across All Strata
+The `survey` package provides a simple methodology to compute the overall mean with standard error (SE) and confidence interval from a stratified design.  This methodology requires the user to first identify characteristics about the study design with `svydesign()`.  For the methodology in Box 3.4, `svydesign()` requires four arguments as follows:
+
+
+* `id`: a "formula" that indicates which variable identifies the primary sampling unit.  If set to `~1` then each row in the data frame is a primary sampling unit.
+* `strata`: a "formula", usually of the form `~stratavar` where `stratavar` is a variable that indicates to which stratum a sampling unit belongs.
+* `fpc`: a "formula", usually of the form `~nvar` where `nvar` is a variable that indicates the number of sampling units in each stratum.
+* `data`: the data frame containing the data.
+
+
+The results of `svydesign()` should be saved to an object and a summary of this new object is obtained with `summary()`.
+
+```{r}
+dstrat <- svydesign(id=~1,strata=~stratum,fpc=~cells,data=d4)
+summary(dstrat)
+```
+
+> **The "formula" arguments in `svydesign()` MUST begin with a tilde.**
+
+The overall mean and SE from the design in the `svydesign()` object is computed with `svymean()`.  This function takes a "formula", usually of the form `~quantvar` where `quantvar` is the variable for which the mean should be computed, as the first argument and the saved `svydesign` object as the second argument.  The `svymean()` function will return the mean and SE when printed.  A confidence interval for the overall mean is computed by saving the result of `svymean()` to an object and submitting it to `confint()`.
+```{r}
+( d.mns <- svymean(~catch,dstrat) )
+confint(d.mns)
+```
+
+### Additional Functionality
+The `survey` package also provides functions for extracting the coefficient of variation (i.e., use `cv()`) and the so-called "design effect" (add `deff=TRUE` to `svymean()`), which is the ratio of the variance using the stratified design to the variance as if a simple random sample had been used.
+```{r}
+cv(d.mns)
+svymean(~catch,dstrat,deff=TRUE)
+```
+
+
+
+## Example of Cluster Sampling
+Five throw nets were deployed at random locations along the shoreline of a lake to collect age=0 bluegill (*Lepomis macrochirus*).  Greater sampling effort would usually be required, but data from these five nets are used to illustrate the procedure.  The weight (g) of each of the age-0 bluegill was measured.  The goal of sampling was to estimate the mean biomass of age-0 bluegill per net, the mean catch per net, and the mean weight of individual age-0 bluegill.
+
+### Preparing Data
+The [`box3_5.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box3_5.txt) is read, the structure of the data frame, and six random rows of the data are observed below.  Note that `catch1` contains the total number of fish caught in a net in the first example in Box 3.5 (where all fish captured were measured).  In contrast, `catch2` is the total number of fish caught in a net in the second sample (where only a subsample of fish captured were measured).  Also note that `net` is a "grouping variable" and is changed to a factor in R.  Finally, note that `fish` is the fish identification number *within* a net.
+
+```{r}
+d5 <- read.table("data/box3_5.txt",header=TRUE)
+str(d5)
+d5$net <- factor(d5$net)
+view(d5)
+```
+
+### Single-Stage Cluster Sample
+The total catch and total weight of fish caught are computed with the aid of `tapply()`.  The `tapply()` function is used to apply a function (given in the `FUN=` argument) to the quantitative variable given in the first argument to each individual in groups defined by the group factor variable in the second argument.  Thus, the mean catch per net (really the total catch in each net because the catch per net was repeated for each fish caught in that net) and the total (sum) weight of all fish caught in each net are computed as shown below.
+
+```{r}
+( catch <- tapply(d5$catch1,d5$net,FUN=mean) )
+( ttl.wt <- tapply(d5$weight,d5$net,FUN=sum) )
+```
+
+The mean fish weight is computed with the aid of `svydesign()` and `svymean()`, both of which are from the `survey` package, and were also described BOX 3.4.  The "design" of the sampling scheme is declared in `svydesign()`.  The `id=` argument is a formula used to identify which variable indicates a primary sampling unit (PSU).  In this case, the primary sampling unit is a net (as stored in the `net` variable).  As the total number of PSU are not know in this case, the `fpc=` argument (Which was described in BOX 3.4). is not used.  Finally, the data frame containing the variables is supplied in `data=`.  The mean weight is then computed with `svymean()` with the `weight` variable in a formula as the first argument and the `svydesign` object as the second argument.  Because there is an `NA` in the `weight` variable corresponding to no fish being caught in the fourth net, the `na.rm=TRUE` argument must be used to tell R to "remove" or "ignore" the NAs.  The saved `svymean` object is submitted to `confint()` to construct a confidence interval for the mean.
+
+```{r}
+dclust <- svydesign(id=~net,data=d5)
+summary(dclust)
+( mn.wt <- svymean(~weight,dclust,na.rm=TRUE) )
+confint(mn.wt)
+```
+
+> **The confidence intervals in this example do not match those in Box 3.5 in the text.  As the mean and SE are the same as those in the text, the discrepancy must be in the use of the critical t value.  I could not replicate nor find a reasoning for the critical t used in the text.**
+
+
+### Two-Stage Cluster Sample
+
+> **I have not yet determined how to do this analysis without simply hard-coding the formulas.**
+
+```{r echo=FALSE, eval=FALSE}
+dclust2 <- svydesign(id=~net+fish,data=d5)
+```
+
+
+
+## Example of Systematic Sampling with Two Starting Points
+The width of a stream was measured at sampling locations arranged every 20 m from two random starting points, with 15 points sampled for each random starting point.
+
+### Preparing Data
+The [`box3_6.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box3_6.txt) is read and the structure of the data frame is observed below.
+
+```{r}
+d6 <- read.table("data/box3_6.txt",header=TRUE)
+str(d6)
+```
+
+As described in the text, a systematic sample with two random starting points can be analyzed as a single-stage cluster sample which was described in BOX 3.5.  The methods of BOX 3.5 are implemented below with the `id=` argument set equal to `start` which defines the samples corresponding to the two starting points.
+```{r}
+dsyst <- svydesign(id=~start,data=d6)
+summary(dsyst)
+( mn.wid <- svymean(~width,dsyst) )
+confint(mn.wt)
+```
+
+
+
+## Example of Regression or Double Sampling
+The percent of coverage by woody material was visually estimated at 25 randomly selected points along a stream, and the actual amount of woody material coverage was measured at 10 of these points, with the goal of estimating mean woody material coverage for this reach.  The regression between the visually estimated coverage and the measured coverage gave the following equation -- Measured coverage = 7.2937 + 1.0357(estimated coverage).
+
+### Preparing Data
+The [`box3_7.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box3_7.txt) is read and the structure of the data frame is observed below.  A new data frame that contains only those observations where both an `estimated` and a `measured` variable were recorded was constructed.
+
+```{r}
+d7 <- read.table("data/box3_7.txt",header=TRUE)
+str(d7)
+d7a <- d7[!is.na(d7$measured),]
+str(d7a)
+```
+
+### Fitting the Regression
+```{r echo=FALSE, results='hide'}
+mn.est1 <- mean(d7a$estimated)
+d7a$c.estimated <- d7a$estimated - mn.est1
+lm1 <- lm(measured~c.estimated,data=d7a)
+```
+
+The regression and calculation shown in Box 3.7 can be simplified by "centering" the `estimated` variable.  A variable is "centered" by subtracting the mean of that variable.  The value of centering is that the intercept when the centered variable is used is equal to the mean of the response variable (i.e., `measured`).  The slope is unaffected by using the centered variable.  The regression is fit on the reduced data frame (note use of `data=d1`) with `lm()` and the coefficients are extracted from the saved `lm` object with `coef()`.  Note that the slope (`r formatC(coef(lm1)[2],digits=4,format="f")`) is the same as that shown at the top of Box 3.7 and the y-intercept (`r formatC(coef(lm1)[1],digits=1,format="f")`) is equal to the mean `measured` variable as shown near the bottom of Box 3.7 in the text.
+```{r}
+mn.est1 <- mean(d7a$estimated)
+d7a$c.estimated <- d7a$estimated - mn.est1
+lm1 <- lm(measured~c.estimated,data=d7a)
+coef(lm1)
+```
+
+> **A variable is *centered* by subtracting the mean of that variable from all observations of that variable.**
+
+> **Centering the explanatory variable in a linear regression will not affect the slope but the intercept will be equal to the mean of the response variable.**
+
+### Estimating the Mean
+The estimated mean coverage using double sampling is then computed by predicting the `measured` value at the *centered* mean of all `estimated` values.  This is accomplished in R using `predict()` with the `lm` object as the first argument and a data frame with the centered mean `estimated` value as the second argument.  A confidence interval for this prediction (a predicted "mean") is computed by including `interval="c"` in `predict()` (I would not usually include `se.fit=TRUE` here but I did in this case to compare the results to that shown in Box 3.7 in the text).
+```{r}
+predict(lm1,data.frame(c.estimated=mean(d7$estimated)-mn.est1),interval="c",se.fit=TRUE)
+```
+
+> **The mean is as described in Box 3.7 but the apparent SE is larger than that shown in Box 3.7 in the text.**
+
+
+## Example of a Completely Randomized Design
+The goal of this study was to determine if walleye (*Sander vitreus*) catch rates differed among Wisconsin lakes with different daily bag limits [@Beardetal2003].  From the thousands of lakes in Wisconsin with walleye populations, six lakes were randomly chosen to have a bag limit of one walleye per day, seven lakes were randomly chosen to have a bag limit of two walleye per day, and nine lakes were randomly chosen to have a bag limit of five walleye per day.  For this analysis, the designation of North or South was ignored.  A fixed-effects general linear model (GLM, implemented in R) was used for the analysis of these data.
+
+### Preparing Data
+The [`box3_8.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box3_8.txt) is read and the structure of the data frame is observed below.  A look at the structure of the data frame shows that `bag_limit` is an "integer" type variable.  To properly perform the ANOVA, this variable must be converted to a factor variable with `factor()` (the explanatory variable to be used in an analysis of variance must be a factor variable in R.  An apparent quantitative variable is coerced to a factor with `factor()`).
+```{r}
+d8 <- read.table("data/box3_8.txt",header=TRUE)
+str(d8)
+d8$fbag_limit <- factor(d8$bag_limit)
+```
+
+### ANOVA Results I
+The one-way ANOVA model is fit using `lm()` and saved into an object.  The ANOVA table of type-I (sequential) SS is then extracted by submitting the `lm` object to `anova()`.  The type-III SS are extracted by submitting the same `lm` object to `Anova()`, from the `car` package, including the `type="III"` argument.
+```{r}
+lm1 <- lm(catch~fbag_limit,data=d8)
+anova(lm1)
+Anova(lm1,type="III")
+```
+
+### Least-Squares Means
+The least-squares means are extracted with `lsmeans()` from the `lsmeans` package.  This function requires the saved `lm` object as the first argument and the factor listed as the right-hand-side in a formula without a left-hand side.  This is illustrated with
+```{r}
+lsmeans(lm1,~fbag_limit)
+```
+
+### A Means Plot
+The `fitPlot()` function from the `FSA` package is used to visually observe the mean (with default 95% CIs) catch rates of the different bag limit groups.  This function only requires the `lm` object as the first argument.  Optional arguments are used to label the x-axis, y-axis, and main title as illustrated below.
+```{r fitPlot3_8}
+fitPlot(lm1,xlab="Walleye Bag Limit",ylab="Walleye Catch Rate",main="")
+```
+
+### ANOVA Results II
+The same model fits summarized with type-II SS are obtained with `Anova()` including the `type="III"` argument.  The conclusions from these summaries are identical to the conclusions from above.
+```{r}
+Anova(lm1,type="II")
+```
+
+
+
+## Example of How to Test Errors (Residuals) for Normality
+In an extension to the example in BOX 3.8, the results of the analysis were augmented to examine the normality of residuals.
+
+The analysis below requires the same data and `lm1` linear model object fit in BOX 3.8 above.
+
+### Testing the Normality Assumption
+R does not have one function that prints out the four tests of normality as shown in Box 3.9 in the text.  However, all four tests of normality shown in Box 3.9 can be accomplished with the following functions,
+
+
+* `ad.test()`: performs Anderson-Darling test (`ad.test()` is from the `nortest} package).
+* `cvm.test()}: performs Cramer-von Mises test (`cvm.test()` is from the `nortest` package).
+* `shapiro.test()`: performs Shapiro-Wilk test
+* `ks.test()`: performs Kolmogorov-Smirnov test.
+
+
+Each of these functions requires the residuals from the linear model fit as the first argument.  These residuals are extracted by appending `$residuals` to the `lm` object name.
+```{r}
+lm1$residuals               # for demonstration purposes only
+ad.test(lm1$residuals)
+cvm.test(lm1$residuals)
+shapiro.test(lm1$residuals)
+```
+
+> **The test statistics for the Anderson-Darling and Cramer-von Mises tests are the same as Box 3.9 in the text, but the p-value are slightly different.**
+
+The `ks.test()` function for performing the Kolmogorov-Smirnov test is a more general function that can test whether the residuals follow any possible continuous distribution.  To use this function to simply test one set of data for normality you must tell the function, as the second argument to the function, to test against a cumulative normal distribution.  In R, the `pnorm()` function contains the cumulative normal distribution.  Thus, a Kolmogorov-Smirnov test of normality is conducted as shown below.
+```{r}
+ks.test(lm1$residuals,"pnorm")
+```
+
+> **The results for the Kolmogorov-Smirnov test are not the same as in Box 3.9 in the text.**
+
+The Q-Q normal probability plot is constructed by submitting the residuals from the linear model to `qqnorm()`.  Personally, I also like to see the histogram of residuals constructed by submitting the linear model residuals to `hist()`.
+```{r}
+qqnorm(lm1$residuals,main="")
+hist(lm1$residuals,main="")
+```
+
+### Testing the Equal Variances Assumption
+The authors of Chapter 3 mention two tests (Bartlett's and Levene's) for equal variances without showing how to perform these tests.  In R, these tests are performed with `bartlett.test()` and `leveneTest()`, from the `car` package, respectively.  Both of these functions can take the same linear model formula as their first argument with the `data=` argument.  However, as a matter of simplicity, `leveneTest()` can also take the `lm` object as it's first argument,
+```{r}
+bartlett.test(catch~fbag_limit,data=d8)
+leveneTest(catch~fbag_limit,data=d8)
+leveneTest(lm1)
+```
+
+The boxplot of the residuals, constructed by submitting the `lm` object to `residPlot()`, from the `FSA` package, is used to produce a general graphic for visualizing the variability among groups.
+```{r fig.width=6, fig.height=3}
+residPlot(lm1)
+```
+
+### Outlier Detection
+The authors of Chapter 3 mentioned that outliers can be problematic in linear modeling.  They mention that individuals with residuals more than three standard deviations from the mean may be considered to be "outliers."  A Studentized residual is essentially a residual that has been standardized to approximately follow a t-distribution.  Thus, any individual with an absolute value studentized residual greater than three could be considered an outlier with the author's suggestion.  Studentized residuals for each individual are computed in R by submitting the `lm` object to `studres()`.
+```{r}
+studres(lm1)
+```
+
+As a more objective measure, `outlierTest()`, from the `car` package, with the `lm` object as its only argument, will extract the largest residual and provide a p-value that uses the Bonferroni method to correct for inflated Type-I errors due to multiple comparisons.  The null hypothesis for this test is that the individual is NOT an outlier.  The result below indicates that the most probable outlier is individual six and it is likely not an outlier (i.e., large Bonferroni p-value).
+```{r}
+outlierTest(lm1)
+```
+
+
+
+## Example of a Randomized Block Design
+In an extension to the analysis of BOXES 3.8 and 3.9, lakes were first blocked into northern and southern Wisconsin lakes, and then treatments were randomly assigned to lakes in each block.  A randomized block design should include the blocking factor during the randomization process.  The R code for this analysis is similar to a completely randomized design, except that a blocking and an interaction variable are included in the model.
+
+The same data used in BOXES 3.8 and 3.9 are used here.
+
+### ANOVA Results I
+The blocked ANOVA is fit using `lm()` with a formula where the right-hand-side is the apparent multiplication of the block factor variable and the group factor variable.  In R, the apparent multiplication of two factor variables in a linear model formula is a short-hand notation to tell R to include each factor as main effects AND the interaction between the two factors.  R denotes the interaction term by separating the main factors with a colon.  I prefer to include the blocking variable first in the analysis as the general idea is to remove the variability associated with this variable.  It does not, however, make a difference to the results in a complete block design using Type-III SS.
+```{r}
+lm1 <- lm(catch~region*fbag_limit,data=d8)
+```
+
+The type-III SS are extracted by submitting the `lm` object to `Anova()` with the `type="III"` argument.  The least-squares means are extracted by submitting the `lm` object to `lsmeans()`.  As there are two factors and an interaction in this model, R must be told to compute the least-squares means separately by including the factor variable names separately in the second argument's formula (note that it is likely better to fit a new model without the insignificant interaction term before computing the least-squares means, as noted by the warning).
+```{r}
+Anova(lm1,type="III")
+lsmeans(lm1,~region)
+lsmeans(lm1,~fbag_limit)
+```
+
+The `fitPlot()` function is used to visually observe the mean (with default 95% CIs) catch rates of the different bag limit groups in the different regions.  The `change.order=` argument is used to change which variable is plotted on the x-axis (you may have to make this plot once before deciding which way you prefer it).
+```{r}
+fitPlot(lm1,change.order=TRUE,xlab="Walleye Bag Limit",ylab="Walleye Catch Rate",main="")
+```
+
+As the interaction term is insignificant, means (with 95% CI) plots for the main effects can be obtained with `fitPlot()` using the `which=` argument set equal to the name of the factor variable to be shown.
+```{r}
+fitPlot(lm1,which="fbag_limit",xlab="Walleye Bag Limit",ylab="Walleye Catch Rate",main="")
+fitPlot(lm1,which="region",xlab="Region",ylab="Walleye Catch Rate",main="")
+```
+
+> **Many authors warn against interpretations between the levels of the blocking variable because the blocks were included in the analysis because there was an *a priori* idea of a difference between the levels and because the levels were generally not randomized.  I have presented the block-levels comparisons here because they were presented in Chapter 3.**
+
+### ANOVA Results II
+The model fit without the interaction term, followed by the type-III SS ANOVA table, and least-squares means is shown below. 
+```{r}
+lm2 <- lm(catch~region+fbag_limit,data=d8)
+Anova(lm2,type="III")
+lsmeans(lm2,~fbag_limit)
+lsmeans(lm2,~region)
+```
+
+### ANOVA Results III
+The same model fits summarized with type-II SS are extracted by submitting the `lm` objects to `Anova()` with `type="II"`.  The conclusions from these summaries are identical to the conclusions from above.
+```{r}
+Anova(lm1,type="II")
+Anova(lm2,type="II")
+```
+
+
+
+## Example of an Analysis of Covariance Design
+The goal of this study was to determine how substrate size affected early growth of brook trout (*Salvelinus fontinalis*) eggs.  In a lab experiment, a fisheries scientist placed individual brook trout eggs into containers with different substrates.  The investigator also believed that egg diameter would affect early growth, so egg size was measured as a continuous covariate.  An analysis of covariance model with egg diameter as the continuous variable and substrate as the categorical treatment variable follows.
+
+### Preparing Data
+The [`box3_11.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box3_11.txt) is read and the structure of the data frame is observed below.
+```{r}
+d11 <- read.table("data/box3_11.txt",header=TRUE)
+str(d11)
+```
+
+### ANCOVA Results I
+The ANCOVA is fit with `lm()` with a formula where the right-hand-side is the apparent multiplication of the quantitative covariate variable and the group factor variable (the meaning of this apparent multiplication is described in BOX 3.10).  The type-III SS are obtained by submitting the `lm` object to `Anova()` with `type="III"`.
+
+```{r}
+lm1 <- lm(growth~egg_diameter*substrate,data=d11)
+Anova(lm1,type="III")
+```
+
+> **The right-hand-side of the `lm()` formula for an ANCOVA should be of the form quantitative*factor, where quantitative represents the quantitative covariate variable and factor represents the categorical group factor variable.**
+
+The `fitPlot()` function is used to visually observe the regression fit between final length (i.e., `growth`) and egg diameter for each substrate type.
+```{r}
+fitPlot(lm1,xlab="Egg Diameter (mm)",ylab="Final length (mm)",legend="topleft",main="")
+```
+
+### ANCOVA Results II
+The anova table of type II SS is extracted by submitting the `lm` object to `Anova()` with `type="II"`.  The p-value for the interaction (`r kPvalue(Anova(lm1,type="III")["egg_diameter:substrate","Pr(>F)"])`) is the same as that shown for the type-III SS because this was the last variable added to the model.  Nevertheless, the interaction term is significant indicating a different slope between final length (i.e., `growth`) and egg diameter among the three substrate types.
+```{r}
+Anova(lm1,type="II")
+```
+
+
+
+## Example of a Mixed-Model Design
+The goal of this study was to determine the effect of herbicide treatment on the abundance of age-0 bluegill (*Lepomis macrochirus*) in lakes.  In theory, treatment with herbicide will create greater access to food resources, so abundance of age-0 bluegill should increase.  Funds were available for treating and sampling only four lakes each year, along with sampling an equivalent number of untreated control lakes.  To increase the sample size available for the experiment, the fisheries scientists treated lakes over four years but were concerned that year-to-year variation in weather could obscure the real effect of treatment.
+
+### Preparing Data
+The [`box3_12.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box3_12.txt) is read and the structure of the data frame is observed below.  The `year` and `lakeID` (though the latter is not used in this Box) are converted to group factor variables with `factor()`.
+```{r}
+d12 <- read.table("data/box3_12.txt",header=TRUE)
+str(d12)
+d12$year <- factor(d12$year)
+d12$lakeID <- factor(d12$lakeID)
+str(d12)
+```
+
+### Quick Exploration
+The `tapply()` function is used to create a two-way table with the results of a function making up the cells of the table.  This function requires the vector of numerical data to be summarized as the first argument, the group factor variables that form the rows and columns in a list as the second arguments, and the function that will summarize the data in the `FUN=` argument.  For example, tables of the means and standard deviations for each `year` and `herbicide` treatment combination are constructed below.
+```{r}
+round(tapply(d12$bluegill,list(d12$herbicide,d12$year), FUN=mean),1) # round for display only
+round(tapply(d12$bluegill,list(d12$herbicide,d12$year), FUN=sd),1)
+```
+
+A boxplot of each `year` and `herbicide` treatment combination is constructed with `bwplot()` from the `lattice` package.  This function requires a formula of the form `+response~factor1|factor2` where `factor2` to the right of the `|` represents the group factor variable that dictates new "panels" for the plot.
+```{r fig.width=5, fig.height=5}
+bwplot(bluegill~herbicide|year,data=d12)
+```
+
+The summary statistics and boxplot indicate that the relationship of the means between the herbicide treatments varies fairly dramatically from year-to-year.  In addition, the variability varies dramatically between years and herbicide treatments without an apparent pattern.
+
+
+### Fitting the Mixed-Effects Model in the Box
+Mixed-effects models are fit in R with `lmer()` from the `lme4` package.  The formula notation in `lmer()` has two parts that correspond to the fixed and random components of the model.  The random effect term must be contained in quotes so that it is parsed correctly; thus, the fixed effects are "left out of parentheses."  In the example below the fixed effects portion of the formula is contained in `1+herbicide`.  In this case the `1` indicates that an overall intercept term should be fit (e.g., if a `0` had been used then estimates for each level in `herbicide` rather than a difference from the "first" level would have been computed).  Also, in the example below, the random effects portion of the formula is contained in `(1|year)`.  The `1` in this portion of the formula indicates the "intercept" and the `|year` portion indicates that a different intercept will be fit for each year.  Finally, `lmer()` takes a `data=` argument and the optional `REML=TRUE` argument if *restrictive maximum likelihood* methods are to be used (set this to `FALSE` to use straight *maximum likelihood methods* (`REML=TRUE` is the default and does not need to be specified.  I specified it in this example so as to explicitly note that that is what the SAS code in Box 3.12 in the text used).
+```{r}
+lme1 <- lmer(bluegill~1+herbicide+(1|year),data=d12,REML=TRUE)
+```
+
+> **The random components in the mixed effects model must be contained in parentheses within the formula of `lmer()`.**
+
+Several extractor functions are used to extract various information from this model fit.  Before showing these results it should be noted that there is considerable debate over exactly how to construct default hypothesis tests in mixed-effects models (primarily surrounding the philosophy of identifying the correct degrees-of-freedom).  As such, the author of `lme4` has opted to not print p-values by default in the R output.  For this reason, it is not possible to reconstruct the exact output shown in Box 3.12.
+
+> **Default p-values are not reported in the R output for mixed-effects models fit with `lmer()` from `lme4`.  This was a conscious decision by the package creator because of debate about the correct degrees-of-freedom to use in these tests.**
+
+Basic information regarding the model fit is extracted by submitting the saved `lmer` object to `summary()` (alternatively, you can use `display()` from the `arm` package).  The AIC, BIC, and log likelihood are printed near the top of the output and closely resemble that shown on the bottom of page 101 (with the exception that R outputs the log likelihood and SAS outputs -2 times the log likelihood).  The variance estimates are printed under the "Random Effects" heading.  The residual variance is `r formatC(attr(VarCorr(lme1),"sc")^2,format="f",digits=0)` and the variance among years is `r formatC(attr(VarCorr(lme1)$year,"stddev")^2,format="f",digits=0)`.  These are identical to what is shown near the bottom of page 101.  Note that the "Std. Dev" column in the R output is simply the square root of the "Variance" column and **NOT** the standard errors as shown in Box 3.12 in the text.
+
+```{r}
+summary(lme1)
+```
+
+
+The conditional means for the random effects shown on page 102 are extracted with `ranef()`.  Standard errors for each of these terms are found with `se.ranef()` from the `arm` package.  Tests for fixed effects shown in the middle of page 102 are extracted with `anova()`.
+```{r}
+ranef(lme1)
+se.ranef(lme1)
+anova(lme1)
+```
+
+I do not know of a specific method for computing the least-squares means from a mixed-effects model.  However, if one modifies the model above by fitting a term for each level of the `herbicide` variable rather than fitting an overall intercept term, then the treatment coefficients are found and they match the least-squares means shown in Box 3.12 in the text.  This is illustrated in the fixed-effects portion of the output below.
+```{r}
+lme1a <- lmer(bluegill~0+herbicide+(1|year),data=d12,REML=TRUE)
+smry1a <- summary(lme1a)
+coef(smry1a)
+```
+
+```{r echo=FALSE, results='hide', cahce=TRUE}
+# needed for Sexpr below
+lme2 <- lmer(bluegill~1+(1|year),data=d12,REML=TRUE)  # fit without fixed term
+```
+An alternative to the fixed-effects test is to use a likelihood ratio test to compare the full model with the fixed `herbicide` term and the model without that term.  This likelihood ratio test can be constructed by fitting the two models (note that the model with the fixed `herbicide` term was fit above and the model without this term is fit below) and then submitting the two model objects to `lrt()` with the more complex model in `com=`.  Both the p-value (`r kPvalue(lrt(lme2,com=lme1)[1,"Pr(>Chisq)"])`) and lower AIC/BIC values indicate that the more complex model with the `herbicide` term is needed.  This further implies that there is a difference among the herbicide treatments.
+```{r}
+lme2 <- lmer(bluegill~1+(1|year),data=d12,REML=TRUE)  # fit without fixed term
+lrt(lme2,com=lme1)                                    # perform LRT comparison
+```
+
+### Predicted Values
+Predicted values for each year and herbicide treatment combination are constructed in a fairly manual way in the code below.  First, the fixed effects and random effects for year from the model where an overall intercept was not estimated are saved to objects.  The fixed effects for the "control" and "herbicide" treatments are then added to the random year effects separately and then combined back together to make a nice table for presentation.
+```{r}
+( fe1a <- fixef(lme1a) )
+( re1a <- ranef(lme1a)$year )
+pred.C <- fe1a[1]+re1a
+pred.H <- fe1a[2]+re1a
+pred <- t(cbind(pred.C,pred.H))
+colnames(pred) <- rownames(re1a)
+rownames(pred) <- c("Control","Herbicide")
+round(pred,1)          # rounded for display purposes only.
+```
+
+These predictions can be compared to sample means computed above to note that the predictions are off a good deal in some year treatment combinations.
+```{r}
+round(tapply(d12$bluegill,list(d12$herbicide,d12$year),FUN=mean)-pred,1)
+```
+
+
+### P-values with Markov Chain Monte Carlo Simulation
+Markov chain Monte Carlo (MCMC) simulation methods can be used to construct approximate confidence intervals and p-values for testing that a parameter is equal to zero for the fixed and random effect parameters in the mixed effect model.  The `pvals.fnc()` function, from the `langaugeR` package, performs the MCMC simulations for the results in an `lmer` object.  This function only requires the saved `lmer` object as the first argument.  However, the number of MCMC simulations is set with `nsims=` and the result of each simulation is returned by including the `withMCMC=TRUE` argument.  The results should be saved to an object where the results for the fixed and random effects are then extracted by appending `$fixed` and `$random` to the saved object name.
+```{r eval=FALSE}
+### THIS NEEDS TO BE UPDATED
+p1a <- pvals.fnc(lme1a,nsim=1000,withMCMC=TRUE)
+p1a$fixed
+p1a$random
+```
+
+Density curves for the MCMC results for each of the parameter estimates are shown below (the "complex" code basically creates a function that stacks the MCMC results and then plots them using `densityplot()` from the `lattice` package.
+
+```{r eval=FALSE, fig.width=5, fig.height=5}
+mcmcM <- as.matrix(p1a$mcmc)
+m <- data.frame(Value=mcmcM[,1],Predictor=rep(colnames(mcmcM)[1],nrow(mcmcM)))
+for (i in 2:ncol(mcmcM)) {
+  mtmp <- data.frame(Value=mcmcM[,i],Predictor=rep(colnames(mcmcM)[i],nrow(mcmcM)))
+  m <- rbind(m, mtmp)
+}
+densityplot(~Value|Predictor,data=m,scales=list(relation="free"),
+    par.strip.text=list(cex=0.75),xlab="Posterior Values",ylab="Density",pch=".")
+```
+
+
+
+## Example of a Factorial Design
+The goal of this study was to determine how size and stocking location of fingerling Chinook salmon (*Oncorhynchus tshawytscha*) affected survival and subsequent return to the Snake River.  @BugertMendel1997 used a 2x2 factorial design in which size (subyearling versus yearling) and location of release (on-station versus off-station) were compared to see how these factors affected survival.  For this example, we have included only years when all treatment combinations were implemented.
+
+### Preparing Data
+The [`box3_13.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box3_13.txt) is read and the structure of the data frame is observed below.  As noted in Box 3.13, the `survival` variable should be transformed because values expressed as proportions (or percentages) rarely meet the normality or equal variances assumptions of ANOVA.  The typical transformations for variables expressed as proportions is to use the arc-sine (i.e., inverse sine) square-root function.  The authors of Box 3.13 used only an arc-sine transformation.  In this vignette, I will use the arc-sine transformation to demonstrate equivalence of R and SAS output and then use the arc-sine square root transformation to demonstrate what I see as the "proper" methodology.  The `survival` variable is transformed to the arc-sine of survival (and called `arcsurv`) with `asin()`.  The arc-sine square root of survival (and called `arcsrsurv`) is computed similarly but includes the use of `sqrt()`.
+```{r}
+d13 <- read.table("data/box3_13.txt",header=TRUE)
+str(d13)
+d13$arcsurv <- asin(d13$survival/100)
+d13$arcsrsurv <- asin(sqrt(d13$survival/100))
+str(d13)
+```
+
+### ANOVA Results I
+The ANOVA, using the arc-sine transformed survival variable, is fit with `lm()` using a formula where the right-hand-side is the apparent multiplication of the two group factor variables (the meaning of this apparent multiplication is described in BOX 3.10).  The type-III SS are obtained by submitting the `lm` object to `Anova()` with `type="III"`.
+```{r}
+lm1 <- lm(arcsurv~size*release,data=d13)
+Anova(lm1,type="III")
+```
+
+The least-squares means are extracted by submitting the `lm` object to `lsmeans()`.  As there are two factors in this model, R must be told to compute the least-squares means separately by including the factor variable names separately in the right-hand-side of the second argument.  In addition, if you the interaction term is supplied to the second argument then the least-squares means for all possible groups will be computed.
+```{r}
+lsmeans(lm1,~size)
+lsmeans(lm1,~release)
+lsmeans(lm1,~size*release)
+```
+
+### ANOVA Results II
+```{r echo=FALSE,include=FALSE}
+# needed for Sexpr below
+lm2 <- lm(arcsrsurv~size*release,data=d13)
+p <- Anova(lm2,type="III")
+p.int <- p["size:release","Pr(>F)"]
+p.size <- p["size","Pr(>F)"] 
+p.release <- p["release","Pr(>F)"]
+```
+The ANOVA using the arc-sine square-root transformed survival variable is fit similarly.  There does not appear to be an interaction between the two factors (`r kPvalue(p.int)`); thus, the main effects can be interpreted.  There does not appear to be a difference in the mean arc-sine square root of survival between the two release sites (`r kPvalue(p.release)`).  However, the mean arc-sine square root of survival does appear to differ significantly between the two sizes of released fish (`r kPvalue(p.size)`).  These are the same qualitative results as was obtained with the arc-sine transformation used in Box 3.13 of the AIFFD book.
+```{r}
+lm2 <- lm(arcsrsurv~size*release,data=d13)
+Anova(lm2,type="III")
+```
+
+The `fitPlot()` function is used to construct an interaction plot where the simultaneous effects of the two factors on the arc-sine square root of survival can be visualized.
+```{r}
+fitPlot(lm2,xlab="Release Size",ylab="Arcsine Square Root of Survival",legend="topleft",main="")
+```
+
+However, because the interaction was insignificant, you can also look at the main-effect means plots using `fitPlot()` with `which=` set equal to the group factor variables of interest (note that the `ylim=` arguments were used to control the range of y-axis so as to allow for a better comparison of the relative effects of the two main effects).
+```{r}
+fitPlot(lm2,which="size",xlab="Release Size",ylab="Arcsine Square Root of Survival",legend="topleft",main="",ylim=c(0.01,0.12))
+fitPlot(lm2,which="release",xlab="Release Site",ylab="Arcsine Square Root of Survival",legend="topleft",main="",ylim=c(0.01,0.12))
+```
+
+### ANOVA Results III
+The same model fits summarized with type-II SS are shown below.  The conclusions from these summaries are identical to the conclusions from above.
+```{r}
+Anova(lm1,type="II")
+Anova(lm2,type="II")
+```
+
+
+## Example of a Nested Design
+For the example in Box 3.12, where the effect of herbicide treatment on age-0 bluegill (*Lepomis macrochirus*) density was investigated, we may also be interested in how herbicide treatment affects mean length of age-0 bluegill at the end of the growing season (for this example, assume that length of individual bluegill from each lake in the study was measured). In a nested design, the primary experimental unit is a lake, so each bluegill is not an independent replicate but rather is a subsample from the lake.  For brevity, only the lakes sampled in 2001 from Box 3.12 are used in this example.
+
+### Preparing Data
+The [`box3_14.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box3_14.txt) is read, the `lake` variable is converted to a factor, and the structure of the data frame is observed below.
+```{r}
+d14 <- read.table("data/box3_14.txt",header=TRUE)
+d14$lake <- factor(d14$lake)
+str(d14)
+```
+
+### Quick Exploration
+A boxplot of fish lengths by each `herbicide` and `lake` combination is constructed with `bwplot()` from the `lattice` package.  This function requires a formula as the first argument.  In this example, the formula will be of the form `response~(factor1:factor2)` so that the x-axis will be labeled with the `herbicide` treatment **and** the `lake` number.  Corresponding summary statistics are computed with `Summarize()` from the `FSA` package.  This function requires the same type of formula as used in `bwplot()` (note that `digits=` controls the number of outputted digits).  Both of these summaries suggest that the mean length is generally greater in the "treatment" lakes and that lake 677 has a considerably lower variability in length.
+
+```{r fig.width=6, fig.height=3}
+bwplot(length~(herbicide:lake),data=d14)
+Summarize(length~(lake:herbicide),data=d14,digits=1)
+```
+
+### Fitting Mixed Effects Model
+Mixed-effects models are fit in R with `lmer()` (use of `lmer()` was defined more thoroughly in BOX 3.12).  In the example below, the fixed effects portion of the formula is contained in `1+herbicide`.  In this case the `1` indicates that an overall intercept term should be fit (if a "0" had been used then estimates for each level in `herbicide` rather than a difference from the "first" level would have been computed).  Also, in the example below, the random effects portion of the formula is contained in `(1|lake:herbicide)`.  The `1` in this portion of the formula indicates the "intercept" and the `|lake:herbicide` portion indicates that a different intercept will be fit for each lake *nested* within the herbicide treatments.
+```{r}
+lme1 <- lmer(length~1+herbicide+(1|lake:herbicide),data=d14,REML=TRUE)
+```
+
+Basic information is extracted from the model fit with `summary()`.  The AIC, BIC, and log likelihood are printed near the top of the output and closely resemble that shown on the middle of page 111 (with the exception that R outputs the log likelihood and SAS outputs -2 times the log likelihood).  The variance estimates are printed under the "Random Effects" heading.  The residual variance is `r formatC(attr(VarCorr(lme1),"sc")^2,format="f",digits=1)` and the variance among lakes is `r formatC(attr(VarCorr(lme1)$'lake:herbicide',"stddev")^2,format="f",digits=1)`.  These are identical to what is shown near the bottom of page 111.  Note that the "Std. Dev" column in the R output is simply the square root of the "Variance" column and **NOT** the standard errors as shown in the Box.  The test for fixed effects shown near the bottom of page 111 is extracted with `anova()`.
+```{r echo=-3}
+summary(lme1)
+anova(lme1)
+lme2 <- lmer(length~1+(1|lake:herbicide),data=d14,REML=TRUE) # fit without fixed term
+```
+
+An alternative to the fixed-effects test is to use a likelihood ratio test to compare the full model with the fixed `herbicide` term and the model without that term (as was described in Box 3.12).  Both the p-value (`r kPvalue(lrt(lme2,com=lme1)[1,"Pr(>Chisq)"])`) and lower AIC/BIC values indicate that the more complex model with the `herbicide` term is needed.  This further implies that there is a difference among the herbicide treatments.
+```{r}
+lme2 <- lmer(length~1+(1|lake:herbicide),data=d14,REML=TRUE) # fit without fixed term
+lrt(lme2,com=lme1)                                           # perform LRT comparison
+```
+
+I do not know of a specific method for computing the least-squares means from a mixed-effects model.  However, if one modifies the model above by fitting a term for each level of the `herbicide` variable rather than fitting an overall intercept term then the treatment coefficients can be found and they match the least-squares means shown at the bottom of the Box.  For example, inspect the fixed-effects portion of the output below.
+```{r}
+lme1a <- lmer(length~0+herbicide+(1|lake:herbicide),data=d14,REML=TRUE)
+smry1a <- summary(lme1a)
+coef(smry1a)
+```
+
+### Examining Random Effects
+The conditional means for the random effects are extracted with `ranef()`.  Standard errors for each of these terms are found with `se.ranef()` from the `arm` package.
+```{r}
+ranef(lme1)
+se.ranef(lme1)
+```
+
+### P-values with Markov Chain Monte Carlo Simulation
+Markov chain Monte Carlo (MCMC) simulation methods are used to construct approximate confidence intervals and p-values for testing that a parameter is equal to zero for the fixed and random effect parameters in the mixed effect model.  Use of the functions below was described in detail in BOX 3.12.
+```{r eval=FALSE}
+#### THIS NEEDS TO BE UPDATED ####
+p1a <- pvals.fnc(lme1a,nsim=1000,withMCMC=TRUE)
+p1a$fixed
+p1a$random
+```
+
+Density curves for the MCMC results for each of the parameter estimates are shown below (the "complex" code basically creates a function that stacks the MCMC results and then plots them using `densityplot()`).
+
+```{r eval=FALSE, fig.width=5, fig.height=5}
+mcmcM <- as.matrix(p1a$mcmc)
+m <- data.frame(Value=mcmcM[,1],Predictor=rep(colnames(mcmcM)[1],nrow(mcmcM)))
+for (i in 2:ncol(mcmcM)) {
+  mtmp <- data.frame(Value=mcmcM[,i],Predictor=rep(colnames(mcmcM)[i],nrow(mcmcM)))
+  m <- rbind(m, mtmp)
+}
+densityplot(~Value|Predictor,data=m,scales=list(relation="free"),
+    par.strip.text=list(cex=0.75),xlab="Posterior Values",ylab="Density",pch=".")
+```
+
+
+
+## Example of a Repeated-Measures Split-Plot Design
+
+> **This is a work in progress as I have not yet determined how to use other than the residual error for the error variance except to do it by hand.**
+
+The goal of this study was to determine the effects of vegetation removal by grass carp (*Ctenopharyngodon idella*) on fish biomass.  @Maceinaetal1994 sampled the same six coves twice before and twice after treatment.  Main plot A included cove, treat, and coveXtreat interaction effects, and subplot B included time and timeXtreat interaction effects.  @Maceinaetal1994 popularized the use of repeated-measures split-plot designs in fisheries, which is appropriate for analyzing data collected through time at fixed stations.  The analysis relies on standard analysis of variance techniques.
+
+### Preparing Data
+The [`box3_15.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box3_15.txt) is read and the structure of the data frame is observed below.  The `time`, `cove`, and `year` variables should be converted to group factor variables with `factor()`.  As in Box 3.15 in the text, `biomass` is converted to common logarithms with `log10()`.
+```{r}
+d15 <- read.table("data/box3_15.txt",header=TRUE)
+str(d15)
+d15$year <- factor(d15$year)
+d15$time <- factor(d15$time)
+d15$cove <- factor(d15$cove)
+d15$logbio <- log10(d15$biomass)
+str(d15)
+```
+
+### Helper Function
+As is demonstrated in Box 3.15, the error term for the "plot" term uses the error term associated with the "plot" and "treatment" interaction term.  As far as I know R does not have a built-in function for computing F-tests with other than the residual or error MS from the full model fit.  Thus, the ANOVA table for these terms must be built by hand by extracting the appropriate MS and df from the Type-III ANOVA table.  This hand calculation is simply finding the appropriate values in the ANOVA table using numerical and named subscripts.  The following function is a helper function that does the "hand" calculations to create the appropriate F-tests.  It should be noted that this function only works if the "plot" and "treatment" are the first two terms in the model and their interactions is the third term.  Fitting models in that order is demonstrated below.
+```{r}
+rmsp2 <- function(object,type=c("III","II","I")) {
+  type <- match.arg(type)
+  if (type=="I") { res <- anova(object)[1:2,1:3] }       # extract df and SS of first three rows
+    else if (type=="III") { res <- Anova(object,type=type)[2:4,2:1] }
+      else { res <- Anova(object,type=type)[1:3,2:1] }
+  res[,"Mean Sq"] <- res[,2]/res[,1]                     # compute MS
+  errorMS <- res[3,"Mean Sq"]                            # MS in 3rd position is error MS
+  res[,"F"] <- c(res[1:2,"Mean Sq"]/errorMS,NA)          # compute F for first 2 positions (put NA in las position)
+  res[,"PR(>F)"] <- c(pf(res[1:2,"F"],res[1:2,"Df"],res[3,"Df"],lower.tail=FALSE),NA)  # convert to p-values
+  res
+}
+```
+
+### Model Fitting I
+The repeated-measures split-plot ANOVA is fit using `lm()` with a twist.  The twist is that `terms()` must be used to control the order that the model terms will be fit.  This is important because the "plot" and "treatment" terms must be fit first followed by their interaction and then followed by the subplot terms.  This function basically has the explicit model formula as the first argument and then the `keep.order=TRUE` argument so that R does not put all of the interactions terms at the end of the model formula.  The overall ANOVA table is extracted with `Anova()` using `type="III"`.
+```{r}
+lm1 <- lm(terms(logbio~cove+treat+cove:treat+time+treat:time,keep.order=TRUE),data=d15)
+Anova(lm1,type="III")
+```
+
+The hypothesis tests using the `cove:treat` MS as the error term are computed using the `rmsp2()` helper function.
+```{r}
+rmsp2(lm1)
+```
+
+### Model Fitting II
+The results are somewhat different if the type-II SS rather than type-III SS are used.
+```{r}
+Anova(lm1,type="II")
+rmsp2(lm1,type="II")
+```
+
+--------------------------------------------------------------
+
+```{r echo=FALSE}
+et <- proc.time() - stime
+reproInfo(rqrdPkgs=rqrd,elapsed=et["user.self"]+et["sys.self"])
+```
+
+```{r echo=FALSE, results='hide', message=FALSE}
+purl2("Chapter4.Rmd",moreItems=c("source","rqrd","stime"))    # Will create the script file
+```
+
+
+--------------------------------------------------------------
+## References
