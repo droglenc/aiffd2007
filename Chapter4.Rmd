@@ -66,7 +66,7 @@ set.seed(983452)
 ## Log-Linear Model to Test for Year-Class Abundance Differences
 Below we conduct a test for year-class abundance differences among the 1990 to 1997 year-classes (`yearcl`) based on catch rates of age-0, age-1, and age-2 crappies (*Pomoxis* spp.) (`age` in years) from Weiss Lake (Table 4.1 in text).  Trap-net catch rates (`catch`) were transformed to natural log values to homogenize variances as recommended by @Kimura1988 for log-linear analysis.  The data in Table 4.1 were rearranged to conduct the analysis.  Year of collection (`yearcol`) was included in the data file, and the following R code was used to conduct the analysis.
 
-###Preparing Data
+### Preparing Data
 The [`box4_1.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box4_1.txt) is read, the structure of the data frame is observed, and a new variable, `lcatch`, that is the natural log of the catch variable is created.
 ```{r}
 d1 <- read.table("data/box4_1.txt",header=TRUE)
@@ -122,7 +122,7 @@ addSigLetters(lm1,which="yearcl",lets=c("c","a","ab","bc","bc","ab","c","ab"),
 ## Evaluation of Time Series Trends in Recruit Abundance
 The following code presents a plot and computes the Pearson correlation coefficient between age-0 C/f (`age0cpe`) of white bass (*Morone chrysops*) and year and the Kendall tau-b non-parametric correlation coefficient for ranks between these two variables (data published in @Madenjianetal2000).  In addition, the simple linear regression between C/f and year was computed along with the Durbin-Watson statistic to determine temporal autocorrelation.  Finally, the residuals from the regression were plotted against year.
 
-###Preparing Data
+### Preparing Data
 The [`box4_2.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box4_2.txt) data file is read and the structure of the data frame is observed below.  It appears that the authors of the box only used years from 1972-1997 in the box even though the data provided on the CD with the AIFFD book is for 1969-1997.  Thus, a new data frame, called `d1`, restricted to years after 1971 is created with `Subset()` from the `FSA` package, with the original data frame as the first argument and a conditional statement from which to create the subset as the second argument.  Note that `Subset()` is very similar to `subset()` from base R with the exception that `Subset()` will remove unused levels from a factor variable after the subsetting.  This feature is useful in many situations but is irrelevant in this situation as the subsetting is conducted on a non-factor variable.
 
 ```{r}
@@ -153,13 +153,13 @@ rcorr(as.matrix(d2a[,c("age0cpe","year")]))
 
 It should be noted that the relationship between `age0cpe` and `year` is clearly non-linear (as observed from the previous plot) indicating that the value of the correlation coefficient is not strictly interpretable (i.e., correlation coefficients assume a linear relationship).
 
-###Kendall's Tau Correlation Analysis}
+### Kendall's Tau Correlation Analysis}
 Kendall's tau-b correlation coefficient is computed by submitting the two variables as the first two arguments to `Kendall()` from the `Kendall` package.
 ```{r}
 Kendall(d2a$age0cpe,d2a$year)
 ```
 
-###Analysis of Residuals from Regression}
+### Analysis of Residuals from Regression}
 The simple linear regression described in the box is fit with `lm()`.  The ANOVA table is extracted from the `lm()` object with `anova()` and the coefficients or estimated parameters, among other summary information, is extracted with `summary()`.  Because of the evident non-linearity, this result is of dubious value.  However, if it were to be interpreted, it shows a significant negative relationship between age-0 CPE and year.
 ```{r}
 lm1 <- lm(age0cpe~year,data=d2a)
@@ -180,7 +180,7 @@ plot(lm1$residuals~d2a$year,type="b",ylab="Residuals",xlab="Year",main="",pch=19
 abline(h=0,lty=2)
 ```
 
-###An Alternative Residual Analysis}
+### An Alternative Residual Analysis}
 The results from above indicate that a strong overall trend in the CPE data by year -- i.e., high and variable CPE in the early years followed by a much lower and less variable CPE in the later years.  The simple linear regression does not represent this trend very well as exhibited by the residual plot (above) and the following fitted-line plot constructed with `fitPlot()` from the `FSA` package.}.
 ```{r}
 fitPlot(lm1,ylab="Age-0 CPE",xlab="Year",main="")
