@@ -1,0 +1,474 @@
+---
+title: "AIFFD Chapter 5 - Age and Growth"
+author: "Derek H. Ogle"
+csl: american-fisheries-society.csl
+output:
+  pdf_document:
+    fig_height: 3
+    fig_width: 3
+    number_sections: yes
+    pandoc_args: --number-offset=5
+    toc: yes
+    toc_depth: 2
+  html_document:
+    fig_height: 4.5
+    fig_width: 4.5
+    highlight: tango
+    number_sections: yes
+    pandoc_args: --number-offset=5
+    toc: yes
+    toc_depth: 2
+bibliography: AIFFDReferences.bib
+---
+\setcounter{section}{5}
+
+```{r echo=FALSE, include=FALSE}
+stime <- proc.time()    # Start time to get processing time
+source('knitr_setup.R')
+```
+
+--------------------------------------------------------------
+
+This document contains R versions of the boxed examples from **Chapter 5** of the "Analysis and Interpretation of Freshwater Fisheries Data" book.  Some sections build on descriptions from previous sections, so each section may not stand completely on its own.  More thorough discussions of the following items are available in linked vignettes:
+
+* the use of linear models in R in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/),
+* differences between and the use of type-I, II, and III sums-of-squares in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/), and
+* the use of "least-squares means" is found in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/).
+
+The following additional packages are required to complete all of the examples (with the required functions noted as a comment and also noted in the specific examples below).
+
+```{r echo=-1, warning=FALSE, message=FALSE}
+rqrd <- c("FSA","car","lsmeans","nlstools")
+library(FSA)       # Summarize, Subset, headtail, fitPlot, lencat, alkIndivAge
+library(car)       # Anova, recode
+library(lsmeans)   # lsmeans
+library(nlstools)  # overview
+```
+
+In addition, external tab-delimited text files are used to hold the data required for each example.  These data are loaded into R in each example with `read.table()`.  Before using `read.table()` the working directory of R must be set to where these files are located on **your** computer.  The working directory for all data files on **my** computer is set with
+
+```{r}
+setwd("C:/aaaWork/Web/fishR/BookVignettes/aiffd2007")
+```
+
+In addition, I prefer to not show significance stars for hypothesis test output, reduce the margins on plots, alter the axis label positions, and reduce the axis tick length.  In addition, contrasts are set in such a manner as to force R output to match SAS output for linear model summaries.  All of these options are set with
+```{r eval=FALSE}
+options(width=90,continue=" ",show.signif.stars=FALSE, contrasts=c("contr.sum","contr.poly"))
+par(mar=c(3.5,3.5,1,1),mgp=c(2.1,0.4,0),tcl=-0.2)
+```
+
+
+
+## Creating an Age-Length Key
+Fisheries scientists often collect length data on large samples, but age data, because of the large amount of effort evolved, are generally collected on smaller samples (i.e., subsamples).  In some cases, we wish to convert our length data to age data.  We do this through the use of an age-length key.  We start with a data set containing individual length and age data.  By dividing length data into a series of discrete intervals, we can determine the frequency of ages within each interval.  These frequencies are transformed into probabilities, which are later used to convert numbers at length to numbers at age.  In this example, we have age (`age`) and length (`tl`) data for adult Spotted Sucker (*Minytrema melanops*).  We create a series of length intervals and create a new variable (`LCat`) that is a discrete representation of the length data.  In this case, we develop 2cm (20mm) length-groups and name each group by the low end of the interval.  We then determine cell frequencies and calculate cell probabilities using the `lencat()` function.
+
+### Ogle Comment
+In my opinion, the age-length key method shown in Box 5.1 of the text is cumbersome because of the tremendous amount of "if...then...else" statements and the fact that the user must re-enter data (i.e., the percentage at age for a given length interval when expanding the age-length key).  In addition, the final result (table on p. 201) produces fractional fish in certain age-length categories.  I recommend that the user consider the @IsermannKnight2005 method for which @IsermannKnight2005 provided a SAS program and I have provided an R program ([age-length key chapter here](https://fishr.wordpress.com/books/ifar/)).  Nevertheless, I will attempt to recreate the process shown in Box 5.1.
+
+### Preparing Data
+The [aged](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/box5_1_Aged.txt) and [length](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/box5_1_Length.txt) data files are read and the structures are observed below.
+```{r}
+d1.age <- read.table("data/box5_1_Aged.txt",header=TRUE)
+str(d1.age)
+d1.len <- read.table("data/box5_1_Length.txt",header=TRUE)
+str(d1.len)
+```
+
+### Constructing an Age-Length Key
+The first step in constructing the age-length key is to create a variable that identifies the length interval category for each fish in the age sample.  This variable is constructed, with default name `LCat`, and appended to the data frame containing the age-sample with `lencat()` from the `FSA` package. In this context, `lencat()` requires four arguments as described below.
+
+* a formula of the form `~len` where `len` generically represents the length variable,
+* `data`: the data frame containing the age-sample,
+* `startcat`: a value identifying the starting length measurement category, and
+* `w`: a value identifying the width of the length measurement categories.
+
+The `lencat()` function returns a data frame that consists of the original data frame plus a variable containing the length interval categories for each fish. The default name of the new variable (`LCat`) can be changed with the `vname=` argument. The `lencat()` function result must be assigned to an object, preferably named differently from the original age sample.
+
+It is important when using an age-length key to make sure that lengths in the age-sample span the same range as the lengths in the length- (i.e., unaged) sample.  Unfortunately, this is not the case with the Spotted Sucker data set provided with Box 5.1.  Nevertheless, one can find the minimum length in the age-sample using `Summarize()` from the `FSA` package.
+```{r R.options=list(width=100)}
+Summarize(d1.age$tl,digits=1)
+```
+
+The length intervals can then start with an even-number 20-mm interval (the authors of Box 5.1 chose to use 20-mm wide intervals) just below the minimum length in the age-sample.  In this example, one could start with either 80- or 90-mm as a start.  I will choose to start with 80-mm to most closely match the work done in Box 5.1 (note that the authors of Box 5.1 used 90 but only had a 10-mm width on the first interval).  The length intervals are then appended to the dataframe (which was renamed to `d1.age1`) with `lencat()`.
+```{r}
+d1.age1 <- lencat(~tl,data=d1.age,startcat=80,w=20)
+headtail(d1.age1)      # to verify the correct addition of the length categories
+```
+
+Once the length category variable has been added to the age sample data frame, `xtabs()` is used to construct the summary contingency table of numbers of fish in each combined length and age category.  The row variable (length category) is the first and the column variable (age) is the second part of the formula in the first argument to this function.  The saved `table` object is then submitted as the first argument to `prop.table() along with `margin=1` as a second argument (this is R's way of saying "row") to construct a row-proportions table. The resulting row-proportions table is the actual age-length key (as proportions and not percentages as shown in Box 5.1) determined from the age sample and is ready to be applied to the length sample.
+```{r}
+d.raw <- xtabs(~LCat+age,data=d1.age1)
+d.key <- prop.table(d.raw,margin=1)
+round(d.key,3)                           # rounded for display only
+```
+
+Finally, it is important to replace all of the "blank" cells ("NA"s in R parlance) with zeroes.  This is most easily accomplished with the code below where the code inside of the square brackets basically finds each position in the `d.key` matrix that has a value of "NA" and the entire code replaces these positions with zeroes.
+```{r}
+d.key[which(is.na(d.key))] <- 0
+round(d.key,3)                           # rounded for display only
+```
+
+The age-length key just computed does not match what is shown in Box 5.1 for a variety of reasons.  Most importantly, the age-length key shown in Box 5.1 is a **column**- rather than **row**-proportions table.  The row-proportions table shown here is correct.  In addition, as noted above, the authors used percentages rather than proportions (which is inefficient because later, in their program, they divide each percentage by 100 to make it a proportion) and their first interval starts at 90-mm and is only 10-mm wide.  In addition, I prefer to show the intermediate length intervals that do not contain any fish in the age-sample.  This may be cumbersome with a wide range of lengths but it will help troubleshoot problems if the length-sample contains fish of these lengths (i.e., there will be no rule to say what age these fish should be).
+
+### Applying the Age-Length Key I
+The first step in applying the age-length key is to construct the length frequency in the same 20-mm wide length intervals used to construct the age-length key.  If the age- and length-samples span the same lengths then one can apply `lencat()` as before, but to the length sample.  As noted before, the length-sample for the Spotted Suckers contains lengths of fish that were not present in the age-sample and, thus, are not present in the age-length key.  This can be seen by quickly summarizing the total lengths in the length-sample (look at the maximum value).
+```{r}
+Summarize(d1.len$tl,digits=2)
+```
+
+Because of the different ranges of lengths in the two samples there is no relation in the age-length key that explains what ages fishes of the non-represented lengths should be.  Thus, for the purposes of this example, the length sample will be reduced to only those fish with total lengths less than 500 mm to correspond with the lengths in the age-length key.  The following use of `Subset()` from the `FSA` package. creates a new data frame (called `d1.len1`) containing only fish from the old data frame with a total length less than 500 mm.
+```{r}
+d1.len1 <- Subset(d1.len,tl<500)
+```
+
+The length intervals variable is then appended to this new data frame and the frequency of fish in each of the length intervals is found with `xtabs()`.
+```{r}
+d1.len2 <- lencat(~tl,data=d1.len1,startcat=80,w=20)
+( len.freq <- xtabs(~LCat,data=d1.len2) )
+```
+
+```{r echo=FALSE,results='hide'}
+key3003 <- d.key["300","3"]*100
+lf300 <- len.freq["300"]
+key3803 <- d.key["380","3"]*100
+key3804 <- d.key["380","4"]*100
+lf380 <- len.freq["380"]
+```
+
+As explained in the text, the idea now is to apportion the number of fish in each length interval of the length-sample into age categories based on the relationships shown in the age-length key.  So, for example, of the `r formatC(lf300,format="f",digits=0)` 300-mm fish in the length sample `r formatC(key3003,format="f",digits=0)`% should be assigned age-3 and of the `r formatC(lf380,format="f",digits=0)` 380-mm fish in the length sample `r formatC(key3803,format="f",digits=1)`% should be assigned age-3 and `r formatC(key3804,format="f",digits=1)`% should be assigned age-4.
+
+As Box 5.1 shows, these calculations can become tedious if you have to do all of these calculations individually.  Fortunately, if you are very careful with the construction of the length intervals, these calculations can be greatly simplified with matrix multiplication.  The multiplication of two matrices requires that the number of columns of the first matrix be the same as the number of rows of the second matrix.  The resulting matrix will have as many rows as the first matrix and as many columns as the second matrix.
+
+The length frequency "vector" can be thought of as a "matrix" with one row and `r length(len.freq)` columns as computed with `length()` (and look at the `len.freq` vector above).  The age-length key has `r nrow(d.key)` rows and `r ncol(d.key)` columns as computed with `dim()` (and look at the age-length key matrix above).  The dimensions of these matrices imply that we can appropriately multiply the length-frequency vector by the age-length key matrix.
+```{r}
+length(len.freq)  # number of columns in length frequency vector
+dim(d.key)        # dimensions (rows, columns) of the age-length key
+```
+
+In matrix multiplication, the cell in the resulting matrix is the sum of the product of each element of the corresponding row in the first matrix and each element in the corresponding column of the second matrix.  For example, the value in the cell of the first row and third column of the resulting matrix is the sum of the product of the elements in the first row of the first matrix and the third column of the second matrix.
+
+In this situation, the resulting matrix will consist of one row with as many columns as ages in the age-length key where each value in the row is the sum of the length frequency values (i.e., the row of the first matrix) times the corresponding column of the age-length key.  Thus, for example, the age-3 column of the resulting matrix would be found with,
+
+```{r}
+0*0+0*0+0*0+0*0+0*0+0*0+0*0+0*0+0*0+0*0+0*0+3*1+6*1+12*1+12*1+30*0.333+28*0+48*0+
+  51*0+61*0+83*0+0*0
+```
+                                                                                            
+If you study this closely you will see that it says "all three 300-mm fish are age-3, all six 320-mm fish are age-3, all twelve 340-mm fish are age-3, all twelve 360-mm fish are age-3, 33.3% of the 30 380-mm fish are age-3, none of the 40 400-mm fish are age-3, ..." which results in "an estimated 43 age-3 fish."  This IS the calculation that we want in order to produce the final age-frequency for the individuals in the length-sample.
+
+Matrix multiplication is accomplished in R with the matrix multiplication operator `%*%`.  This operator must be preceded by the first matrix and succeeded by the second matrix to be multiplied.  Note that you will get an error if the dimensions do not match as discussed above.
+```{r error=TRUE}
+( age.freq <- len.freq %*% d.key )
+```
+
+### Applying the Age-Length Key II
+As noted in the beginning, it is my opinion that the @IsermannKnight2005 method is a better method for handling age-length keys.  In this section, I will demonstrate how to apply this method to the Spotted Sucker data.  This section assumes that the age-length key has already been constructed (as shown above) and the modified length sample (i.e., only those fish less than 500 mm) is being used.
+
+The @IsermannKnight2005 method is implemented with `alkIndivAge()` from the `FSA` package. This function requires the following arguments,
+
+* `key`: A numeric matrix containing the age-length key (as constructed with `prop.table()`).
+* `dl`: A data frame containing the length-sample of fish.
+* `cl`: A number or character string indicating which column of `dl` contains the length measurements.
+* `ca`: A number or character string indicating which column of `dl` should receive the age assignments.  If the column does not exist in the current data frame then one will be appended with the name given in `ca`.
+
+The `alkIndivAge()` function will determine the length categories to construct based on the age-length key sent in the `key=` argument.  The results of `alkIndivAge()` should be assigned to an object, preferably with a name different from the original length sample.
+```{r warning=FALSE}
+d1.len3 <- alkIndivAge(d.key,~tl,data=d1.len1)
+headtail(d1.len3)
+```
+
+The original (not modified) age-sample data frame and the modified length-sample data frame (i.e., now containing the ages assigned via the age-length key) can then be row-bound together with `rbind()` to construct a data frame that consists of lengths and ages for all fish in the study.
+```{r}
+d1.comb <- rbind(d1.len3,d1.age[,c("tl","age")])
+headtail(d1.comb)
+```
+
+The assigned ages in the `rb.comb` data frame can then be used to, for example, compute an overall age-frequency with `xtabs()` or calculate summary statistics of size-at age for ALL individuals in the study with `Summarize()`.
+```{r warning=FALSE}
+xtabs(~age,data=d1.comb)
+Summarize(tl~age,data=d1.comb,digits=2)
+```
+
+
+
+## Determining Mean Back-Calculated Length at Age
+In addition to providing estimates of age, hard parts are often used to back-calculate length at younger ages.  To demonstrate how this is accomplished, we will be using a data set determined from scales and describing the age and growth of Spotted Sucker from the Savannah River.  For each fish, our data set contains an identification number (`ID`), sex (`sex`), total length-at-capture (`Lc`), year of capture (`date`), age (`age`), radius of ageing structure (scale) at capture (`Sc`), annulus $i$ (`inc`), and scale radius at each annulus $i$ (`Si`) for each individual annulus.
+
+### Ogle Comment
+The authors of Box 5.2 refer the reader to the review by @Francis1990 for back-calculation methods that are alternatives to the Dahl-Lea and Fraser-Lee methods.  It is my opinion that @Francis1990 provides a definitive review of all back-calculation methods and I strongly suggest any fisheries biologist who plans to perform back-calculations read his review.  The rest of the document below follows the analyses that were performed in Box 5.2.
+
+### Preparing Data
+The [Box5_2.txt](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/box5_2.txt) is read and the structure and first six lines of the data frame are observed.
+```{r}
+d2 <- read.table("data/box5_2.txt",header=TRUE)
+str(d2)
+head(d2)
+```
+
+It is very important to note that this data file is already in what is called one-radii-per-line format.  This is noted by the fact that the first three lines of the data file all pertain to fish number 07447.  Note that all information in those three rows is the same except in the columns labeled `inc` and `Si` which are the previous age $i$ (i.e., annulus number) and the scale radius at age $i$.  It is common for the data to be collected in what is called one-fish-per-line format where all information for one fish is found in one row of the data file.  The data must be in one-radii-per-line format to efficiently back-calculate length-at-age.  Methods of converting from one format to the other format are described [in Chapter 2 here](https://fishr.wordpress.com/books/ifar/).
+
+**The data must be in one-radii-per-line format for back-calculation methods.**
+
+For some back-calculation methods (e.g., Dahl-Lea) it is not important that the measurements made on the fish and those made on the scales are in the same units.   However, a common set of units is required for other methods (e.g., Fraser-Lee).  The scale and fish measurements should be converted to common units to guard against forgetting to do this later.  The authors note that the fish measurements in this example are mm whereas the scale measurements are in cm at a magnification of 24X.  Thus, the scale measurements are converted to actual mm (and stored in a new variable) as shown below.
+```{r}
+d2$Si2 <- d2$Si*10/24   # convert radial measurements
+d2$Sc2 <- d2$Sc*10/24   # convert total scale radius
+head(d2)
+```
+
+**In general, the scale and length measurements should be in the same units (i.e., the same scale).**
+
+
+### Dahl-Lea Method
+We start with the simple case in which the growth of the structure used for ageing is directly proportional to the growth of the fish.  This method is generally referred to as the Dahl-Lea method [@Dahl1907, Lea1910] and allows one to back-calculate length at age for individual fish. The formula is
+
+\[ L_{i} = L_{c}\frac{S_{i}}{S_{c}} \]
+
+where $L_{i}$ is back-calculated length at annulus $i$, $L_{c}$ is length at capture, $S_{i}$ is ageing-structure radius at annulus $i$, and $S_{c}$ is ageing-structure radius at capture.  Using the R code below, we can generate back-calculated total lengths ($L_{i}$) and calculate mean length at age for the Spotted Sucker population.
+
+The Dahl-Lea method of back-calculating fish length at previous age (and stored in a variable called `Li1`) can be accomplished very simply with an R expression (note the use of the modified scale measurement variables).  Summary statistics (similar to the table shown on page 206 of Box 5.2) can be computed with `Summarize()`.
+```{r warning=FALSE}
+d2$LiDL <- d2$Lc*d2$Si2/d2$Sc2
+head(d2)
+Summarize(LiDL~inc,data=d2)
+```
+
+### Fraser-Lee Model
+In some cases, structures such as scales may take some time to form after hatch or metamorphosis.  Consequently, early length estimates are biased.  The Fraser-Lee model [@Fraser1916, Lee1920] accounts for this bias by including a biological intercept in the model.  The model is,
+
+\[ L_{i} = a + (L_{c}-a)\frac{S_{i}}{S_{c}} \]
+
+The parameter $a$ is the intercept determined from the ageing-structure radius and fish length relationship and the other variables are previously defined.
+
+Because we are using scales to back-calculate length at age, we will likely require a correction factor.  Because we did not collect empirical data or find information in the literature regarding the length of scale formation in Spotted Sucker, then we must estimate this parameter by modeling the known relationship between ageing-structure radius and fish-length at capture from our Spotted Sucker data set.  Even had we found this information in the literature, performing the below calculations is another good way to check one's data.
+
+The regression of length at age $i$ on scale radius at age $i$ as described in Box 5.2 is conducted with `lm()` with a formula of the form `response`\verb+~+`explanatory` as the first argument and the data frame containing the variables in `data=`.  The ANOVA table and estimated coefficients, among other statistics, are extracted from the saved `lm` object with `anova()` and `summary()`, respectively.
+```{r}
+lm1 <- lm(LiDL~Si2,data=d2)
+anova(lm1)
+summary(lm1)
+```
+```{r echo=FALSE,results='hide'}
+a <- coef(lm1)[1]
+```
+
+The intercept from this model (`r formatC(a,format="f",digits=2)`) is an estimate of the correction factor required for the Fraser-Lee method.  The back-calculated length-at-age using the Fraser-Lee method is then constructed by extracting this value from the saved `lm` object and saving it to it's own object and then writing an R expression for the Fraser-Lee equation.  Summary statistics (similar to the Table shown on page 209 of Box 5.2) are then computed with `Summarize()`.
+```{r warning=FALSE}
+a <- coef(lm1)[1]               # get the correction factor (first coefficient in lm1)
+d2$LiFL <- a + (d2$Lc-a)*(d2$Si2/d2$Sc2)
+head(d2)
+Summarize(LiFL~inc,data=d2)
+```
+
+## Assessing Differences in Length at Age Between Groups 
+Now that we have corrected back-calculated length at age in BOX 5.2, we can test for differences between groups.  For example, we commonly want to test for a sex effect on the length at age.  We can use our previous example to evaluate differences between sexes by means of an analysis of covariance (ANCOVA) approach.  We start with our Spotted Sucker data set containing fish identification number (`ID`), sex (`sex`), total length at capture (`Lc`), year of capture (`date`), age (`age`), radius of aging structure (scale) at capture (`Sc`), annulus increment number $i$ (`inc`), and radius of aging structure at $i$ (`Si`).  We calculate the length at each increment using a direct proportion method and incorporate the Fraser-Lee correction factor calculated in BOX 5.2.  Given that growth has a curvilinear component, we create a dummy variable (`incsq`) (The authors use the word "dummy variable" here but this is not a correct use of the word.  A dummy variable indicates to which group an individual below; e.g., 0=female and 1=male. In this case, the authors simply create a squared term of a quantitative explanatory variable so as to allow for a quadratic or second-degree polynomial regression.) to be incorporated into the model.
+
+The same data from from BOX 5.2 is used here, taking note that `LiFL` contains the back-calculated lengths at age using the Fraser-Lee method.
+
+### Assessing Differences in Length-At-Age between Groups
+In Box 5.3 the author's use a second-degree polynomial (i.e., quadratic) model to determine if "growth" (i.e., back-calculated length-at-age) differed between males and females.  To perform this analysis, a squared version of the explanatory variable (i.e., `incSqrd`) is created and stored in the data frame.  The linear model is then fit with a right-hand-side that contains the `sex` group factor variable, both `inc` and `incSqrd` quantitative explanatory variables (to perform the quadratic regression), and the interaction between `sex` and both quantitative explanatory variables (to completely assess whether there was a difference between the sexes).  The saved `lm` object is submitted to `anova()` to extract the Type-I SS and to `Anova()` from the `car` package with `type="III"` to extract the type-III SS.
+```{r}
+d2$incSqrd <- d2$inc^2
+lm2 <- lm(LiFL~sex+inc+incSqrd+inc*sex+incSqrd*sex,data=d2)
+anova(lm2)             # type-I SS
+Anova(lm2,type="III")  # type-III SS
+```
+
+It is interesting to look at a plot of the results -- even though it is a bit cumbersome to construct this plot.  From this it is immediately apparent that the choice of a quadratic model was a poor choice.  I would suggest using a von Bertalanffy model instead (see BOX 5.4) or, for comparing two groups, [in Chapter 9 here](https://fishr.wordpress.com/books/ifar/).
+```{r}
+# base schematic for adding points to
+plot(LiFL~inc,data=d2,col="white",xlab="Age",ylab="Back-Calculated Length")
+# add points for males and females, with slight offsets so they can be seen
+points(LiFL~I(inc-0.1),col="red",pch=16,data=Subset(d2,sex=="M"))
+points(LiFL~I(inc+0.1),col="black",pch=16,data=Subset(d2,sex=="F"))
+
+# create a sequence of increment numbers
+incs <- seq(1,17,0.1)
+# predict ages for males and females & then plot the lines
+predM <- predict(lm2,data.frame(inc=incs,incSqrd=incs^2,sex=rep("M",length(incs))))
+predF <- predict(lm2,data.frame(inc=incs,incSqrd=incs^2,sex=rep("F",length(incs))))
+lines(predM~incs,col="red",lwd=2)
+lines(predF~incs,col="black",lwd=2)
+```
+
+
+
+## Fitting a von Bertalanffy Growth Curve 
+The length-at-age data on Spotted Sucker illustrated in Figure 5.4 (text) and BOX 5.2 will be used here.  For each individual in the data set, we have entered total length (`tl`) and age (`age`).  Therefore, each fish represents a single degree of freedom in the analysis.  To minimize bias, similar numbers of fish from each year-class should be included in the model.  If older or younger age-classes are not well represented in the analysis, confidence limits at the extremes of the curve may expand dramatically or the model will fail to converge.  Parameters for the growth curve can now be estimated iteratively using a nonlinear regression approach with the following R code (I have provided a more thorough analysis of how to fit von Bertalanffy models is in [Chapter 9 here](https://fishr.wordpress.com/books/ifar/).  You may want to read that document before continuing with the description below for Box 5.4).
+
+### Preparing Data 
+The [`box5_4.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/box5_4.txt) is read and the structure of the data frame is observed.
+```{r}
+d4 <- read.table("data/box5_4.txt",header=TRUE)
+str(d4)
+```
+
+### Getting Initial Values for the Model Parameters 
+As noted in Box 5.4, the computer algorithms for fitting non-linear models are iterative and require starting values for the parameters.  An alternative to what was described in Box 5.4 for identifying starting values for the traditional von Bertalanffy equation is to plot the data and use interactive graphics to visually "fit" the von Bertalanffy model.  The parameters from this process can then serve as the starting values for the more objective non-linear modeling algorithm.  The `vbStarts()` function in the `FSA` package provides a mechanism for visually fitting the von Bertalanffy model.  For this purpose, `vbStarts()` has the three argumentsbelow.
+
+* a formula of the form `len~age`,
+* `data=`: a data frame that contains the `len` and `age` variables,
+* `type=`: a string that identifies which parameterization to use (`model="typical"` is used for the traditional von Bertalanffy model used in Box 5.4),
+* `dynamicPlot=TRUE`: which will create the interactive graphic.
+
+This function will produce a graphics and a dialog box with slider bars corresponding to the parameters of the von Bertalanffy model (see below).  The slider bars can be manipulated until an approximate fit is obtained.  The values of the parameters at this approximate fit are then entered into a named R list with `list()` for later use.
+
+```{r eval=FALSE}
+vbStarts(tl~age,data=d4,type="typical",dynamicPlot=TRUE)
+```
+```{r}
+sv <- list(Linf=481,K=0.47,t0=0)
+```
+
+\includegraphics[width=5in]{Figs/sv.png}
+
+### Fitting the von Bertalanffy Model 
+The von Bertalanffy model as an R formula is best placed into an object as shown below.  When doing this, make sure that `tl` and `age` are the exact names of the length and age variables in your data frame and that `Linf`, `K`, and `t0` are the exact names of the parameters that you stored in your starting values list.
+```{r}
+vbmdl <- tl~Linf*(1-exp(-K*(age-t0)))
+```
+
+The non-linear model fitting procedure in R is implemented with `nls()`, which requires the model formula as the first argument, the list of starting values in `start=`, and the data frame in `data=`.  The coefficient estimates and the correlations among coefficient estimates are extracted from the saved `nls` object with `overview()` from the `nlstools` package.  One should pay very close attention to the correlations among parameter estimates shown in the results below.  These values illustrate VERY strong correlations among the parameters which hinders interpretation as many other parameter triplets would provide nearly the same model fit (this is illustrated with the lack of change in SS for the last 15 or so iterations of the model fitting as shown in Box 5.4).
+
+```{r}
+ssvb <- nls(vbmdl,start=sv,data=d4)
+overview(ssvb)
+```
+
+Finally, one can plot the model fit by plotting the raw data, creating a sequence of ages that cover the range of observed ages, using the model results to predicted lengths at each age in the sequence, and then plotting the age sequence and predicted length pairs as a line with `lines()`.  It is apparent from this plot that this model suffers from the lack of young small fish in the sample (i.e., it is unrealistic that the mean length of age-0 fish is nearly 500 mm).
+```{r}
+plot(tl~age,data=d4,pch=16,xlab="Age",ylab="Total Length (mm)",xlim=c(0,11),ylim=c(0,550))
+ages <- seq(0,11,0.1)
+preds <- predict(ssvb,data.frame(age=ages))
+lines(preds~ages,lwd=2,col="red")
+```
+
+### Comparison Among Groups 
+The authors of Chapter 5 hint at comparisons of von Bertalanffy model parameters between groups but do not provide an example of such an analysis.  An example of this analysis in R can be found in [in Chapter 9 here](https://fishr.wordpress.com/books/ifar/).
+
+
+## Identifying the Environmental Effects on Growth 
+Often, fisheries scientists are interested in evaluating the effects of some management strategy on growth.  Length limits, fertilization, and water level manipulations, for example, may all produce time-specific effects.  We cannot simply compare pre-treatment length with post-treatment length.  @WeisbergFrie1987  demonstrated a method of isolating annular growth effects by calculating growth increment and assigning this not only to a specific age but to a specific year.  We will use data collected from a population of Spotted Sucker to test the effects of an extended drought on growth.  The drought occurred from 2000 through 2003.  Rather than test for the effect of a specific individual year, we group years together by rainfall.  Although it would have improved the statistical performance of the model, note that it is not necessary to sample pre-treatment fish length as long as the post-treatment sample contains a representative sample of fish that were alive during the pre-treatment period.  In this case, year-classes from normal and drought (dry) years were present in the sample.
+
+### Preparing Data 
+The [`box5_5.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/box5_5.txt) is read and the structure of the data frame is observed.  The `bcage` is converted to a group factor variable with `factor()`.
+```{r}
+d5 <- read.table("data/box5_5.txt",header=TRUE)
+str(d5)
+d5$bcage <- factor(d5$bcage)
+```
+
+The authors added a `group` variable that corresponded to pre-2000 and 2000-and-after which were labeled as "normal" and "dry", respectively.  This variable is created in R with `recode()` from the `car` package which requires a variable as the first argument and recoding directives as the second argument.  In this case, we want to recode `bcyear` such that years before 2000 are labeled as "normal" and years after 1999 are labeled as "dry."  Thus, the recoding directive, which must be contained in double quotes, says that all years between 1995 (the first year present) and 1999 (the `:` operator creates a sequence of unit-spaced integers between the two numbers) will be recoded as "normal" and all other years (as denoted by `else=`) as "dry."  Note that `as.factor.result=TRUE` forces R to return the result as a group factor variable.
+```{r}
+d5$group <- recode(d5$bcyear,"1995:1999='normal';else='dry'",as.factor.result=TRUE)
+str(d5)
+```
+
+### Some Preliminaries 
+These data provide some limitations in the analysis as described in Box 5.5.  To understand some of these limitations one must first look at the "structure" of the data and some summaries.  The first thing to note about the `d5` data frame is that it is in one-increment-per-row format (discussed in BOX 5.4).  In this format a great deal of information specific to the fish (i.e., **NOT** the increment) is repeated in several rows in the data frame.  This can be seen by looking at the first ten rows of the data frame using `head()`.
+```{r}
+head(d5,n=10)
+```
+
+It is not needed for the analysis but it is useful for summary information if we create a data frame that isolates (only once) the information for each fish.  This reduction is accomplished by first realizing that the fish specific information is in the first six columns of `d5` and then using `unique()`, which will return only the unique rows of a data frame.  
+```{r}
+d5fish <- unique(d5[,1:6])
+str(d5fish)
+```
+
+With this new data frame the number of fish of each age captured in each year is constructed with `xtabs()`.  From this it is seen that all fish were captured in the same year, no fish less than age-3 were collected, and no age-8 (but age-7 and age-9) fish were captured.  These results show that all information for "normal" rainfall years will come from the "early" growth increments on the "older" fish.
+```{r}
+xtabs(~year+age,data=d5fish)
+```
+
+The linear model to be fit uses the `bcage` and `group` variables.  A frequency table of these two variables (below) shows that it will be impossible to determine the effect of back-calculated ages six, seven, eight, and nine during the "normal" rainfall years as there is no data available for these age-group combinations.  This unbalanced "design" will impact the ability to interpret an interaction in the model.
+```{r}
+tbl2 <- xtabs(~group+bcage,data=d5)
+addmargins(tbl2)
+```
+
+### Fitting the Model I 
+```{r echo=FALSE, results='hide'}
+lm1 <- lm(growth~bcage*group,data=d5)
+```
+The ANOVA model is fit with `lm()` and the ANOVA table with type-I SS is obtained by submitting the `lm` object to `anova()`.  As described in Box 5.5, the interaction term is insignificant (`r kPvalue(anova(lm1)[3,"Pr(>F)"])`) and will be removed from the model in the next section.
+
+```{r}
+lm1 <- lm(growth~bcage*group,data=d5)
+anova(lm1)
+```
+
+Before moving on, it should be noted taht the type-III SS ANOVA table cannot be computed with `Anova()` because of the "unbalanced" design.  In other words, the command below results in the error shown.
+```{r error=TRUE}
+Anova(lm1,type="III")
+```
+
+### Fitting the Model II 
+The model without the interaction term is fit below and the corresponding ANOVA table with Type-I SS is again obtained with `anova()`.  Because this model without the interaction does not have the difficulties associated with the missing values for the older ages in the "normal" rainfall years, a type-III SS ANOVA table is constructed by submitting the saved `lm` object to `Anova()` with `type="III"`.  In either regard, both the `bcage` and `group` variables are "significant" indicating that growth differs by age (not surprisingly) and (more interestingly) by group.
+```{r}
+lm2 <- lm(growth~bcage+group,data=d5)
+anova(lm2)
+Anova(lm2,type="III")
+```                                                                         
+
+The least-squares means are computed by submitting the `lm` object to `lsmeans()` from the `lsmeans` package.  As there are two factors in this model, R must be told to compute the least-squares means separately by including the factor variable names separately in the `factors=` argument as such,
+```{r}
+lsmeans(lm2,~group)
+lsmeans(lm2,~bcage)
+```
+
+The `fitPlot()` from the `FSA` package can be used to visualize the simultaneous effects of the two factors on `growth`.  The so-called interaction plot is constructed by submitting the saved `lm` object to `fitPlot()`, along with the typical other arguments for modifying the plot.  The observation that trajectories of growth by age for the "normal" and "dry" periods are generally parallel supports the conclusion of no interaction between age and group.
+```{r}
+fitPlot(lm2,xlab="Age",ylab="Growth (mm)",legend="topright",main="")
+```
+      
+```{r eval=FALSE,echo=FALSE}
+# an alternative look
+library(effects)
+plot(effect("bcage",lm2),xlab="Age",ylab="Growth (mm)",main="",ylim=c(0,140))
+plot(effect("group",lm2),xlab="Rainfall Group",ylab="Growth (mm)",main="",ylim=c(0,140))
+plot(effect("bcage*group",lm2))
+```
+
+
+## Estimating Growth from Mark and Recapture Data 
+In this example, data on the carapace length of Loggerhead Turtles (*Caretta caretta*) at mark and at recapture will be used to fit a von Bertalanffy growth curve by means of the @Fabens1965 method. For each individual in the data set, time at large (`days`) has been calculated from the mark and recapture dates.  Carapace length at mark (`clmark`) and at recapture (`clrecap`) and time at large (`timeoutd`) has been entered for each individual.  To calculate the von Bertalanffy growth parameters in a standard form, time at large has been converted from days to years (`timeouty`).  Each individual, therefore, represents a single degree of freedom in the analysis.  If older and younger age-classes are not well represented in the analysis, or if time at large is long with respect to the expected age of the animal, convergence criteria for parameter estimation may not be met.  Parameters for the growth curve can now be estimated iteratively using a nonlinear regression approach with the following R code.
+
+### Preparing Data
+The [Box5_6.txt](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/box5_6.txt) is read and the structure of the data frame is observed.  As noted in Box 5.6, the `timeoutd` variable is the time-at-large in days and is converted to time-at-large in years `timeouty` below.
+```{r}
+d6 <- read.table("data/box5_6.txt",header=TRUE)
+str(d6)
+d6$timeouty <- d6$timeoutd/365
+```
+
+### Getting Initial Values for the Model Parameters
+As noted in BOX 5.4, the von Bertalanffy model, even with the Fabens method, is a non-linear model that will require initial values for the model fitting.  Unlike with the traditional von Bertalanffy model illustrated in BOX 5.4, graphic methods for finding the starting values have not been developed for Fabens' method.  Fortunately, finding starting values is fairly straight-forward.  A simple starting value for the asymptotic mean length is the maximum length in the data frame.  A reasonable starting value for the Brody growth coefficient is the average (from all fish in the sample) instantaneous growth rate between the time at marking and the time a recapture.  These initial values are then entered into a list as shown in BOX 5.4.
+```{r}
+svLinf <- max(d6$clrecap)
+svK <- with(d6, mean((log(clrecap)-log(clmark))/timeouty))
+( Fsv <- list(Linf=svLinf,K=svK) )
+```
+
+### Fitting the von Bertalanffy Model
+The Fabens method von Bertalanffy model as an R formula is placed into an object, the non-linear model fitting procedure in R is implemented with `nls()`, and the coefficient estimates and the correlations among coefficient estimates are extracted with `overview()` as described in BOX 5.4.
+```{r}
+Fvbmdl <- clrecap ~ clmark+(Linf-clmark)*(1-exp(-K*timeouty))
+tvb <- nls(Fvbmdl,start=Fsv,data=d6)
+overview(tvb)
+```
+
+--------------------------------------------------------------
+
+```{r echo=FALSE}
+et <- proc.time() - stime
+reproInfo(rqrdPkgs=rqrd,elapsed=et["user.self"]+et["sys.self"])
+```
+
+```{r echo=FALSE, results='hide', message=FALSE}
+purl2("Chapter5.Rmd",moreItems=c("source","rqrd","stime"))    # Will create the script file
+```
+
+
+--------------------------------------------------------------
+## References
