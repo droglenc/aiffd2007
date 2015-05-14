@@ -242,7 +242,7 @@ catch  257  407  147   32   17    5    4</code></pre>
 </div>
 <div id="chapman-robsons-method" class="section level3">
 <h3><span class="header-section-number">6.3.2</span> Chapman-Robson’s Method</h3>
-<p>The maximum-likelihood method for estimating the rate of survival proposed by <span class="citation">Chapman and Robson (1960)</span> and <span class="citation">Robson and Chapman (1961)</span> is implemented with <code>chapmanRobson()</code> from the <code>FSA</code> package. This function requires an R formula of the form <code>catches</code><code>ages</code>, where <code>catches</code> generically represents the vector of catch numbers and <code>ages</code> generically represents the vector of ages, as the first argument, the data frame from which those vectors are drawn as the second (or <code>data=</code>) argument and a vector of the fully recruited ages as the third (or <code>ages2use=</code>) argument. The ages of fully recruited fish can be identified with a full range (e.g., <code>3:10</code>) or a concatenated list of ages (e.g., <code>c(3,4,5,6,7,8,9,10)</code>). The best estimates (with SEs) of the annual survival <span class="math">\(S\)</span> and instantaneous mortality <span class="math">\(Z\)</span> rates are extracted from the saved <code>chapmanRobson</code> object with <code>summary()</code>, the 95% confidence intervals for the two parameters are extracted with <code>confint()</code>, and a plot depicting the Chapman-Robson calculations is obtained with <code>plot()</code> (Note that the results shown here and those shown in the text differ slightly because more precision is used here on intermediate calculations).</p>
+<p>The maximum-likelihood method for estimating the rate of survival proposed by <span class="citation">Chapman and Robson (1960)</span> and <span class="citation">Robson and Chapman (1961)</span> is implemented with <code>chapmanRobson()</code> from the <code>FSA</code> package. This function requires an R formula of the form <code>catches</code>~<code>ages</code>, where <code>catches</code> generically represents the vector of catch numbers and <code>ages</code> generically represents the vector of ages, as the first argument, the data frame from which those vectors are drawn as the second (or <code>data=</code>) argument and a vector of the fully recruited ages as the third (or <code>ages2use=</code>) argument. The ages of fully recruited fish can be identified with a full range (e.g., <code>3:10</code>) or a concatenated list of ages (e.g., <code>c(3,4,5,6,7,8,9,10)</code>). The best estimates (with SEs) of the annual survival <span class="math">\(S\)</span> and instantaneous mortality <span class="math">\(Z\)</span> rates are extracted from the saved <code>chapmanRobson</code> object with <code>summary()</code>, the 95% confidence intervals for the two parameters are extracted with <code>confint()</code>, and a plot depicting the Chapman-Robson calculations is obtained with <code>plot()</code> (Note that the results shown here and those shown in the text differ slightly because more precision is used here on intermediate calculations).</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>cr1 &lt;-<span class="st"> </span><span class="kw">chapmanRobson</span>(d3$age,d3$catch,<span class="dv">3</span>:<span class="dv">10</span>)
 &gt;<span class="st"> </span><span class="kw">summary</span>(cr1)</code></pre>
 <pre><code>    Estimate Std. Error
@@ -273,32 +273,22 @@ Z  0.4958664  0.5926147</code></pre>
 <h3><span class="header-section-number">6.4.2</span> The Catch-Curve Method – First Principles</h3>
 <div id="unweighted-regression" class="section level4">
 <h4><span class="header-section-number">6.4.2.1</span> Unweighted Regression</h4>
-<p>Linear regressions in R are performed with <code>lm()</code> where the first argument is a formula of the form <code>y</code><code>x</code> and the second (<code>data=</code>) argument is the data frame in which the variables can be found. An optional third (<code>subset=</code>) argument can be used to efficiently create a subset of a data frame to be used for that particular linear model. This argument is particularly important in catch-curve analyses because it can be used to limit the analysis to only those ages that appear to be fully recruited to the gear. In this example, the authors have determined that all fish age-3 and older are fully recruited and should be used to estimate the mortality rate. The ANOVA table is extracted from the saved <code>lm</code> object with <code>anova()</code>, the parameter estimates are extracted with <code>summary()</code>, and default 95% CIs for the parameters are extracted with <code>confint()</code>.</p>
+<p>Linear regressions in R are performed with <code>lm()</code> where the first argument is a formula of the form <code>y</code>~<code>x</code> and the second (<code>data=</code>) argument is the data frame in which the variables can be found. An optional third (<code>subset=</code>) argument can be used to efficiently create a subset of a data frame to be used for that particular linear model. This argument is particularly important in catch-curve analyses because it can be used to limit the analysis to only those ages that appear to be fully recruited to the gear. In this example, the authors have determined that all fish age-3 and older are fully recruited and should be used to estimate the mortality rate. The ANOVA table is extracted from the saved <code>lm</code> object with <code>anova()</code>, the parameter estimates are extracted with <code>summary()</code>, and default 95% CIs for the parameters are extracted with <code>confint()</code>.</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>cc1 &lt;-<span class="st"> </span><span class="kw">lm</span>(logcatch~age,<span class="dt">data=</span>d3,<span class="dt">subset=</span>age&gt;=<span class="dv">3</span>)
 &gt;<span class="st"> </span><span class="kw">anova</span>(cc1)</code></pre>
-<pre><code>Analysis of Variance Table
-
-Response: logcatch
-          Df  Sum Sq Mean Sq F value    Pr(&gt;F)
+<pre><code>          Df  Sum Sq Mean Sq F value    Pr(&gt;F)
 age        1 10.9766 10.9766  1072.5 5.391e-08
-Residuals  6  0.0614  0.0102                  </code></pre>
+Residuals  6  0.0614  0.0102                  
+Total      7 11.0380                          </code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">summary</span>(cc1)</code></pre>
-<pre><code>
-Call:
-lm(formula = logcatch ~ age, data = d3, subset = age &gt;= 3)
-
-Residuals:
-     Min       1Q   Median       3Q      Max 
--0.11342 -0.08876  0.01113  0.07263  0.12057 
-
-Coefficients:
+<pre><code>Coefficients:
             Estimate Std. Error t value Pr(&gt;|t|)
 (Intercept)  6.66033    0.10758   61.91 1.19e-09
 age         -0.51122    0.01561  -32.75 5.39e-08
 
 Residual standard error: 0.1012 on 6 degrees of freedom
-Multiple R-squared:  0.9944,    Adjusted R-squared:  0.9935 
-F-statistic:  1073 on 1 and 6 DF,  p-value: 5.391e-08</code></pre>
+Multiple R-squared: 0.9944, Adjusted R-squared: 0.9935 
+F-statistic:  1073 on 1 and 6 DF,  p-value: 5.391e-08 </code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">confint</span>(cc1)</code></pre>
 <pre><code>                 2.5 %     97.5 %
 (Intercept)  6.3970827  6.9235800
@@ -337,29 +327,19 @@ age         -0.5494179 -0.4730256</code></pre>
 <p>The second weighted regression is then fit with <code>lm()</code> exactly as before except that the weights just created are identified in the <code>weights=</code> argument.,</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>cc2 &lt;-<span class="st"> </span><span class="kw">lm</span>(logcatch~age,<span class="dt">data=</span>d3,<span class="dt">subset=</span>age&gt;=<span class="dv">3</span>,<span class="dt">weights=</span>W)
 &gt;<span class="st"> </span><span class="kw">anova</span>(cc1)</code></pre>
-<pre><code>Analysis of Variance Table
-
-Response: logcatch
-          Df  Sum Sq Mean Sq F value    Pr(&gt;F)
+<pre><code>          Df  Sum Sq Mean Sq F value    Pr(&gt;F)
 age        1 10.9766 10.9766  1072.5 5.391e-08
-Residuals  6  0.0614  0.0102                  </code></pre>
+Residuals  6  0.0614  0.0102                  
+Total      7 11.0380                          </code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">summary</span>(cc2)</code></pre>
-<pre><code>
-Call:
-lm(formula = logcatch ~ age, data = d3, subset = age &gt;= 3, weights = W)
-
-Weighted Residuals:
-      Min        1Q    Median        3Q       Max 
--0.196521 -0.153502 -0.006143  0.128350  0.228641 
-
-Coefficients:
+<pre><code>Coefficients:
             Estimate Std. Error t value Pr(&gt;|t|)
 (Intercept)  6.66128    0.10002   66.60 7.71e-10
 age         -0.51139    0.01643  -31.12 7.31e-08
 
 Residual standard error: 0.1822 on 6 degrees of freedom
-Multiple R-squared:  0.9938,    Adjusted R-squared:  0.9928 
-F-statistic: 968.3 on 1 and 6 DF,  p-value: 7.314e-08</code></pre>
+Multiple R-squared: 0.9938, Adjusted R-squared: 0.9928 
+F-statistic: 968.3 on 1 and 6 DF,  p-value: 7.314e-08 </code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>( Z &lt;-<span class="st"> </span>-<span class="kw">coef</span>(cc2)[<span class="dv">2</span>] )</code></pre>
 <pre><code>      age 
 0.5113879 </code></pre>
@@ -373,12 +353,10 @@ F-statistic: 968.3 on 1 and 6 DF,  p-value: 7.314e-08</code></pre>
 <p>The methods described above are implemented with <code>catchCurve()</code> from the <code>FSA</code> package. This function requires the same first three arguments as described for <code>chapmanRobson()</code> in <a href="#robson-and-chapmans-maximum-likelihood-estimation-of-survival">Box 6.3</a>. Note that the original, not logged, catches are given in this function. In addition, the weighted regression can be performed by including <code>use.weights=TRUE</code>. Specific information can be extracted from the results in the <code>catchCurve()</code> object as described for <code>chapmanRobson()</code> in <a href="#robson-and-chapmans-maximum-likelihood-estimation-of-survival">Box 6.3</a>.</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>cc3 &lt;-<span class="st"> </span><span class="kw">catchCurve</span>(catch~age,d3,<span class="dv">3</span>:<span class="dv">10</span>)                    <span class="co"># unweighted catch-curve</span>
 &gt;<span class="st"> </span><span class="kw">anova</span>(cc3)</code></pre>
-<pre><code>Analysis of Variance Table
-
-Response: log.catch.e
-          Df  Sum Sq Mean Sq F value    Pr(&gt;F)
+<pre><code>          Df  Sum Sq Mean Sq F value    Pr(&gt;F)
 age.e      1 10.9766 10.9766  1072.5 5.391e-08
-Residuals  6  0.0614  0.0102                  </code></pre>
+Residuals  6  0.0614  0.0102                  
+Total      7 11.0380                          </code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">summary</span>(cc3)</code></pre>
 <pre><code>    Estimate Std. Error  t value   Pr(&gt;|t|)
 Z  0.5112218 0.01560993 32.74978 5.3913e-08
@@ -488,44 +466,36 @@ A 28.2624898         NA       NA           NA</code></pre>
 <p>The method described in the box is the same as the ANCOVA discussed for Box 3.11 in the <a href="https://fishr.wordpress.com/books/aiffd/">Chapter 3 Vignette</a> and is fit with <code>lm()</code>. Also note that <code>subset=</code> argument is used to restrict the model to only age-2 and older fish (the authors note that fish age-2 and older are fully recruited to the gear). The type-I SS ANOVA table is extracted from the saved <code>lm</code> object with <code>anova()</code>, whereas the type-III and type-II SS ANOVA tables are extracted with <code>Anova()</code> (from the <code>car</code> package) with the appropriate <code>type=</code> argument. Because the interaction term is the last term in this model, all three types of SS provide the same p-value leading to the result that the interaction is insignificant. An insignificant interaction indicates that the slope does not differ between the groups. As the slope is directly related to the estimated instantaneous mortality rate (<span class="math">\(Z\)</span>) this also suggests that there is no difference in <span class="math">\(Z\)</span> between the two lakes. A plot of the fitted models to further illustrate this point is obtained with <code>fitPlot()</code> from the <code>FSA</code> package.</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>lm1 &lt;-<span class="st"> </span><span class="kw">lm</span>(logcatch~age*lake,<span class="dt">data=</span>d6,<span class="dt">subset=</span>age&gt;=<span class="dv">2</span>)
 &gt;<span class="st"> </span><span class="kw">anova</span>(lm1)</code></pre>
-<pre><code>Analysis of Variance Table
-
-Response: logcatch
-          Df  Sum Sq Mean Sq F value    Pr(&gt;F)
+<pre><code>          Df  Sum Sq Mean Sq F value    Pr(&gt;F)
 age        1 20.0825 20.0825 26.0612 0.0003414
 lake       1  0.3946  0.3946  0.5120 0.4891677
 age:lake   1  0.6598  0.6598  0.8563 0.3746383
-Residuals 11  8.4765  0.7706                  </code></pre>
+Residuals 11  8.4765  0.7706                  
+Total     14 29.6134                          </code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">Anova</span>(lm1,<span class="dt">type=</span><span class="st">&quot;III&quot;</span>)</code></pre>
-<pre><code>Anova Table (Type III tests)
-
-Response: logcatch
-            Sum Sq Df F value    Pr(&gt;F)
-(Intercept) 50.793  1 65.9140 5.677e-06
-age          8.942  1 11.6047  0.005861
-lake         0.263  1  0.3412  0.570899
-age:lake     0.660  1  0.8563  0.374638
-Residuals    8.477 11                  </code></pre>
+<pre><code>             Sum Sq     Df  F value    Pr(&gt;F)
+(Intercept) 101.361   1.00 131.5364  1.85e-07
+age          21.113   1.00  27.3984 0.0002792
+lake          0.263   1.00   0.3412 0.5708985
+age:lake      0.660   1.00   0.8563 0.3746383
+Residuals     8.477  11.00                   
+Total        15.000 131.87                   </code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">Anova</span>(lm1,<span class="dt">type=</span><span class="st">&quot;II&quot;</span>)</code></pre>
-<pre><code>Anova Table (Type II tests)
-
-Response: logcatch
-           Sum Sq Df F value    Pr(&gt;F)
-age       20.4650  1 26.5575 0.0003166
-lake       0.3946  1  0.5120 0.4891677
-age:lake   0.6598  1  0.8563 0.3746383
-Residuals  8.4765 11                  </code></pre>
+<pre><code>           Sum Sq     Df F value    Pr(&gt;F)
+age       20.4650  1.000 26.5575 0.0003166
+lake       0.3946  1.000  0.5120 0.4891677
+age:lake   0.6598  1.000  0.8563 0.3746383
+Residuals  8.4765 11.000                  
+Total     14.0000 29.996                  </code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">fitPlot</span>(lm1,<span class="dt">main=</span><span class="st">&quot;&quot;</span>)</code></pre>
 <p><img src="data:image/png;base64,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" title alt width="432" /></p>
 <p>The overall estimate of the common instantaneous mortality rate is found by fitting a model to the combined data set (i.e., ignoring <code>lake</code>). Thus, the overall instantaneous mortality rate is 0.53.</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>lm2 &lt;-<span class="st"> </span><span class="kw">lm</span>(logcatch~age,<span class="dt">data=</span>d6,<span class="dt">subset=</span>age&gt;=<span class="dv">2</span>)
 &gt;<span class="st"> </span><span class="kw">anova</span>(lm2)</code></pre>
-<pre><code>Analysis of Variance Table
-
-Response: logcatch
-          Df  Sum Sq Mean Sq F value    Pr(&gt;F)
+<pre><code>          Df  Sum Sq Mean Sq F value    Pr(&gt;F)
 age        1 20.0825 20.0825  27.392 0.0001613
-Residuals 13  9.5309  0.7331                  </code></pre>
+Residuals 13  9.5309  0.7331                  
+Total     14 29.6134                          </code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">coef</span>(lm2)</code></pre>
 <pre><code>(Intercept)         age 
   6.7901714  -0.5320886 </code></pre>
@@ -881,31 +851,34 @@ Standard error of phi includes sampling and individual variability.</code></pre>
 <hr />
 <pre><code>Reproducibility Information
   Compiled Date: Wed May 13 2015
-  Compiled Time: 7:01:54 PM
-  Code Execution Time: 3.19 s
+  Compiled Time: 7:49:42 PM
+  Code Execution Time: 2.99 s
 
   R Version: R version 3.2.0 (2015-04-16)
   System: Windows, i386-w64-mingw32/i386 (32-bit)
-  Base Packages: base, datasets, graphics, grDevices, methods, stats, utils
+  Base Packages: base, datasets, graphics, grDevices, grid, methods, stats,
+    utils
   Required Packages: FSA, car and their dependencies (dplyr, gdata, gplots,
     graphics, Hmisc, knitr, lmtest, MASS, mgcv, multcomp, nnet, pbkrtest,
     plotrix, quantreg, relax, sciplot, stats)
-  Other Packages: car_2.0-25, FSA_0.6.13, knitr_1.10.5, rmarkdown_0.6.1
+  Other Packages: car_2.0-25, estimability_1.1, Formula_1.2-1, FSA_0.6.13,
+    FSAdata_0.1.9, ggplot2_1.0.1, Hmisc_3.16-0, Kendall_2.2, knitr_1.10.5,
+    lattice_0.20-31, lsmeans_2.17, multcomp_1.4-0, mvtnorm_1.0-2,
+    NCStats_0.4.3, nlstools_1.0-1, plotrix_3.5-11, rmarkdown_0.6.1,
+    survival_2.38-1, TH.data_1.0-6
   Loaded-Only Packages: acepack_1.3-3.3, assertthat_0.1, bitops_1.0-6,
-    caTools_1.17.1, cluster_2.0.1, codetools_0.2-11, colorspace_1.2-6,
-    DBI_0.3.1, digest_0.6.8, dplyr_0.4.1, evaluate_0.7, foreign_0.8-63,
-    formatR_1.2, Formula_1.2-1, gdata_2.16.1, ggplot2_1.0.1, gplots_2.17.0,
-    grid_3.2.0, gridExtra_0.9.1, gtable_0.1.2, gtools_3.4.2, highr_0.5,
-    Hmisc_3.16-0, htmltools_0.2.6, KernSmooth_2.23-14, lattice_0.20-31,
-    latticeExtra_0.6-26, lme4_1.1-7, lmtest_0.9-33, magrittr_1.5,
-    MASS_7.3-40, Matrix_1.2-0, mgcv_1.8-6, minqa_1.2.4, multcomp_1.4-0,
-    munsell_0.4.2, mvtnorm_1.0-2, nlme_3.1-120, nloptr_1.0.4, nnet_7.3-9,
-    parallel_3.2.0, pbkrtest_0.4-2, plotrix_3.5-11, plyr_1.8.2,
-    proto_0.3-10, quantreg_5.11, RColorBrewer_1.1-2, Rcpp_0.11.6,
-    relax_1.3.15, reshape2_1.4.1, rpart_4.1-9, sandwich_2.3-3,
-    scales_0.2.4, sciplot_1.1-0, SparseM_1.6, splines_3.2.0, stringi_0.4-1,
-    stringr_1.0.0, survival_2.38-1, TH.data_1.0-6, tools_3.2.0,
-    yaml_2.1.13, zoo_1.7-12</code></pre>
+    boot_1.3-16, caTools_1.17.1, cluster_2.0.1, coda_0.17-1,
+    codetools_0.2-11, colorspace_1.2-6, DBI_0.3.1, digest_0.6.8,
+    dplyr_0.4.1, evaluate_0.7, foreign_0.8-63, formatR_1.2, gdata_2.16.1,
+    gplots_2.17.0, gridExtra_0.9.1, gtable_0.1.2, gtools_3.4.2, highr_0.5,
+    htmltools_0.2.6, KernSmooth_2.23-14, latticeExtra_0.6-26, lme4_1.1-7,
+    lmtest_0.9-33, magrittr_1.5, MASS_7.3-40, Matrix_1.2-0, mgcv_1.8-6,
+    minqa_1.2.4, munsell_0.4.2, nlme_3.1-120, nloptr_1.0.4, nnet_7.3-9,
+    parallel_3.2.0, pbkrtest_0.4-2, plyr_1.8.2, proto_0.3-10,
+    quantreg_5.11, RColorBrewer_1.1-2, Rcpp_0.11.6, relax_1.3.15,
+    reshape2_1.4.1, rpart_4.1-9, sandwich_2.3-3, scales_0.2.4,
+    sciplot_1.1-0, SparseM_1.6, splines_3.2.0, stringi_0.4-1,
+    stringr_1.0.0, tools_3.2.0, yaml_2.1.13, zoo_1.7-12</code></pre>
 <hr />
 <div class="references">
 <h2>References</h2>

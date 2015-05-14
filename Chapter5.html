@@ -259,19 +259,19 @@ percZero
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">xtabs</span>(~age,<span class="dt">data=</span>d1.comb)</code></pre>
 <pre><code>age
  1  2  3  4  5  6  7  8  9 10 
- 6  4 54 77 57 23 32 14 71 57 </code></pre>
+ 6  4 54 77 58 23 32 13 70 58 </code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">Summarize</span>(tl~age,<span class="dt">data=</span>d1.comb,<span class="dt">digits=</span><span class="dv">2</span>)</code></pre>
 <pre><code>   age  n   mean    sd min    Q1 median    Q3 max percZero
 1    1  6 108.00  8.37  99 101.0  107.5 113.2 120        0
 2    2  4 251.75  2.36 250 250.0  251.0 252.8 255        0
-3    3 54 360.48 22.87 318 344.0  359.5 379.0 399        0
-4    4 77 410.56 15.23 382 399.0  413.0 418.0 438        0
-5    5 57 438.58  7.99 420 434.0  437.0 444.0 459        0
-6    6 23 450.26  5.46 441 449.0  451.0 452.0 459        0
-7    7 32 466.84  4.11 462 463.0  467.0 470.0 474        0
-8    8 14 449.71  5.40 441 445.2  451.0 451.8 459        0
-9    9 71 475.13 16.57 443 463.0  470.0 492.0 499        0
-10  10 57 491.95  6.61 480 486.0  494.0 497.0 499        0</code></pre>
+3    3 54 360.67 23.12 318 344.0  359.5 379.0 399        0
+4    4 77 411.32 16.49 382 399.0  413.0 418.0 438        0
+5    5 58 438.34 10.20 420 431.0  437.5 448.2 459        0
+6    6 23 448.52  4.93 441 444.5  449.0 450.5 459        0
+7    7 32 467.47  4.26 462 463.0  467.0 470.0 474        0
+8    8 13 448.92  5.78 441 444.0  449.0 452.0 459        0
+9    9 70 474.47 16.37 443 463.0  468.5 493.0 499        0
+10  10 58 492.21  6.35 480 490.0  494.0 497.0 499        0</code></pre>
 </div>
 </div>
 <div id="determining-mean-back-calculated-length-at-age" class="section level2">
@@ -359,32 +359,22 @@ percZero
 <p><span class="math">\[ L_{i} = a + (L_{c}-a)\frac{S_{i}}{S_{c}} \]</span></p>
 <p>The parameter <span class="math">\(a\)</span> is the intercept determined from the ageing-structure radius and fish length relationship and the other variables are previously defined.</p>
 <p>Because we are using scales to back-calculate length at age, we will likely require a correction factor. Because we did not collect empirical data or find information in the literature regarding the length of scale formation in Spotted Sucker, then we must estimate this parameter by modeling the known relationship between ageing-structure radius and fish-length at capture from our Spotted Sucker data set. Even had we found this information in the literature, performing the below calculations is another good way to check one’s data.</p>
-<p>The regression of length at age <span class="math">\(i\)</span> on scale radius at age <span class="math">\(i\)</span> as described in Box 5.2 of the text is conducted with <code>lm()</code> with a formula of the form <code>response</code><code>explanatory</code> as the first argument and the data frame containing the variables in <code>data=</code>. The ANOVA table and estimated coefficients, among other statistics, are extracted from the saved <code>lm</code> object with <code>anova()</code> and <code>summary()</code>, respectively.</p>
+<p>The regression of length at age <span class="math">\(i\)</span> on scale radius at age <span class="math">\(i\)</span> as described in Box 5.2 of the text is conducted with <code>lm()</code> with a formula of the form <code>response</code>~<code>explanatory</code> as the first argument and the data frame containing the variables in <code>data=</code>. The ANOVA table and estimated coefficients, among other statistics, are extracted from the saved <code>lm</code> object with <code>anova()</code> and <code>summary()</code>, respectively.</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>lm1 &lt;-<span class="st"> </span><span class="kw">lm</span>(LiDL~Si2,<span class="dt">data=</span>d2)
 &gt;<span class="st"> </span><span class="kw">anova</span>(lm1)</code></pre>
-<pre><code>Analysis of Variance Table
-
-Response: LiDL
-           Df  Sum Sq Mean Sq F value    Pr(&gt;F)
+<pre><code>           Df  Sum Sq Mean Sq F value    Pr(&gt;F)
 Si2         1 6486641 6486641  3672.4 &lt; 2.2e-16
-Residuals 414  731254    1766                  </code></pre>
+Residuals 414  731254    1766                  
+Total     415 7217895                          </code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">summary</span>(lm1)</code></pre>
-<pre><code>
-Call:
-lm(formula = LiDL ~ Si2, data = d2)
-
-Residuals:
-     Min       1Q   Median       3Q      Max 
--108.929  -23.408   -2.516   24.922  127.170 
-
-Coefficients:
+<pre><code>Coefficients:
             Estimate Std. Error t value Pr(&gt;|t|)
 (Intercept)  35.4914     5.1755   6.858 2.56e-11
 Si2          50.8834     0.8397  60.600  &lt; 2e-16
 
 Residual standard error: 42.03 on 414 degrees of freedom
-Multiple R-squared:  0.8987,    Adjusted R-squared:  0.8984 
-F-statistic:  3672 on 1 and 414 DF,  p-value: &lt; 2.2e-16</code></pre>
+Multiple R-squared: 0.8987, Adjusted R-squared: 0.8984 
+F-statistic:  3672 on 1 and 414 DF,  p-value: &lt; 2.2e-16 </code></pre>
 <p>The intercept from this model (35.49) is an estimate of the correction factor required for the Fraser-Lee method. The back-calculated length-at-age using the Fraser-Lee method is then constructed by extracting this value from the saved <code>lm</code> object and saving it to it’s own object and then writing an R expression for the Fraser-Lee equation. Summary statistics (similar to the Table shown on page 209 of Box 5.2 in the text) are then computed with <code>Summarize()</code>.</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>a &lt;-<span class="st"> </span><span class="kw">coef</span>(lm1)[<span class="dv">1</span>]               <span class="co"># get the correction factor (first coefficient in lm1)</span>
 &gt;<span class="st"> </span>d2$LiFL &lt;-<span class="st"> </span>a +<span class="st"> </span>(d2$Lc-a)*(d2$Si2/d2$Sc2)
@@ -427,28 +417,24 @@ F-statistic:  3672 on 1 and 414 DF,  p-value: &lt; 2.2e-16</code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>d2$incSqrd &lt;-<span class="st"> </span>d2$inc^<span class="dv">2</span>
 &gt;<span class="st"> </span>lm2 &lt;-<span class="st"> </span><span class="kw">lm</span>(LiFL~sex+inc+incSqrd+inc*sex+incSqrd*sex,<span class="dt">data=</span>d2)
 &gt;<span class="st"> </span><span class="kw">anova</span>(lm2)             <span class="co"># type-I SS</span></code></pre>
-<pre><code>Analysis of Variance Table
-
-Response: LiFL
-             Df  Sum Sq Mean Sq   F value    Pr(&gt;F)
+<pre><code>             Df  Sum Sq Mean Sq   F value    Pr(&gt;F)
 sex           1  116872  116872   62.7762 2.205e-14
 inc           1 4287009 4287009 2302.7123 &lt; 2.2e-16
 incSqrd       1  937827  937827  503.7418 &lt; 2.2e-16
 sex:inc       1    9743    9743    5.2334   0.02267
 sex:incSqrd   1  134986  134986   72.5061 3.189e-16
-Residuals   410  763306    1862                    </code></pre>
+Residuals   410  763306    1862                    
+Total       415 6249742                            </code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">Anova</span>(lm2,<span class="dt">type=</span><span class="st">&quot;III&quot;</span>)  <span class="co"># type-III SS</span></code></pre>
-<pre><code>Anova Table (Type III tests)
-
-Response: LiFL
-             Sum Sq  Df F value    Pr(&gt;F)
-(Intercept)  383970   1 206.244 &lt; 2.2e-16
-sex           49899   1  26.803 3.537e-07
-inc         1305905   1 701.450 &lt; 2.2e-16
-incSqrd      477711   1 256.596 &lt; 2.2e-16
-sex:inc      143893   1  77.290 &lt; 2.2e-16
-sex:incSqrd  134986   1  72.506 3.189e-16
-Residuals    763306 410                  </code></pre>
+<pre><code>             Sum Sq      Df  F value    Pr(&gt;F)
+(Intercept)  244395       1  131.274 &lt; 2.2e-16
+sex           49899       1   26.803 3.537e-07
+inc         1974817       1 1060.748 &lt; 2.2e-16
+incSqrd      688101       1  369.605 &lt; 2.2e-16
+sex:inc      143893       1   77.290 &lt; 2.2e-16
+sex:incSqrd  134986       1   72.506 3.189e-16
+Residuals    763306     410                   
+Total           416 3999397                   </code></pre>
 <p>It is interesting to look at a plot of the results – even though it is a bit cumbersome to construct this plot. From this it is immediately apparent that the choice of a quadratic model was a poor choice. I would suggest using a von Bertalanffy model instead (see <a href="#fitting-a-von-bertalanffy-growth-curve">Box 5.4</a>) or, for comparing two groups, <a href="https://fishr.wordpress.com/books/ifar/">in Chapter 9 here</a>.</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="co"># base schematic for adding points to</span>
 <span class="er">&gt;</span><span class="st"> </span><span class="kw">plot</span>(LiFL~inc,<span class="dt">data=</span>d2,<span class="dt">col=</span><span class="st">&quot;white&quot;</span>,<span class="dt">xlab=</span><span class="st">&quot;Age&quot;</span>,<span class="dt">ylab=</span><span class="st">&quot;Back-Calculated Length&quot;</span>)
@@ -622,14 +608,12 @@ group      1   2   3   4   5   6   7   8   9 Sum
 <p>The ANOVA model is fit with <code>lm()</code> and the ANOVA table with type-I SS is obtained by submitting the <code>lm</code> object to <code>anova()</code>. As described in Box 5.5 of the text, the interaction term is insignificant (<span class="math">\(p=0.5173\)</span>) and will be removed from the model in the next section.</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>lm1 &lt;-<span class="st"> </span><span class="kw">lm</span>(growth~bcage*group,<span class="dt">data=</span>d5)
 &gt;<span class="st"> </span><span class="kw">anova</span>(lm1)</code></pre>
-<pre><code>Analysis of Variance Table
-
-Response: growth
-             Df Sum Sq Mean Sq F value    Pr(&gt;F)
+<pre><code>             Df Sum Sq Mean Sq F value    Pr(&gt;F)
 bcage         8 333756   41720 95.5221 &lt; 2.2e-16
 group         1   6501    6501 14.8838 0.0001485
 bcage:group   4   1422     356  0.8141 0.5172580
-Residuals   230 100453     437                  </code></pre>
+Residuals   230 100453     437                  
+Total       243 442132                          </code></pre>
 <p>Before moving on, it should be noted that the type-III SS ANOVA table cannot be computed with <code>Anova()</code> because of the “unbalanced” design. In other words, the command below results in the error shown.</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">Anova</span>(lm1,<span class="dt">type=</span><span class="st">&quot;III&quot;</span>)</code></pre>
 <pre><code>Error in Anova.III.lm(mod, error, singular.ok = singular.ok, ...): there are aliased coefficients in the model</code></pre>
@@ -639,22 +623,18 @@ Residuals   230 100453     437                  </code></pre>
 <p>The model without the interaction term is fit below and the corresponding ANOVA table with Type-I SS is again obtained with <code>anova()</code>. Because this model without the interaction does not have the difficulties associated with the missing values for the older ages in the “normal” rainfall years, a type-III SS ANOVA table is constructed by submitting the saved <code>lm</code> object to <code>Anova()</code> with <code>type=&quot;III&quot;</code>. In either regard, both the <code>bcage</code> and <code>group</code> variables are “significant” indicating that growth differs by age (not surprisingly) and (more interestingly) by group.</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>lm2 &lt;-<span class="st"> </span><span class="kw">lm</span>(growth~bcage+group,<span class="dt">data=</span>d5)
 &gt;<span class="st"> </span><span class="kw">anova</span>(lm2)</code></pre>
-<pre><code>Analysis of Variance Table
-
-Response: growth
-           Df Sum Sq Mean Sq F value    Pr(&gt;F)
+<pre><code>           Df Sum Sq Mean Sq F value    Pr(&gt;F)
 bcage       8 333756   41720  95.827 &lt; 2.2e-16
 group       1   6501    6501  14.931 0.0001444
-Residuals 234 101875     435                  </code></pre>
+Residuals 234 101875     435                  
+Total     243 442132                          </code></pre>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">Anova</span>(lm2,<span class="dt">type=</span><span class="st">&quot;III&quot;</span>)</code></pre>
-<pre><code>Anova Table (Type III tests)
-
-Response: growth
-            Sum Sq  Df F value    Pr(&gt;F)
-(Intercept) 427936   1 982.937 &lt; 2.2e-16
-bcage       340056   8  97.635 &lt; 2.2e-16
-group         6501   1  14.931 0.0001444
-Residuals   101875 234                  </code></pre>
+<pre><code>            Sum Sq     Df F value    Pr(&gt;F)
+(Intercept) 199470      1 458.168 &lt; 2.2e-16
+bcage       340056      8  97.635 &lt; 2.2e-16
+group         6501      1  14.931 0.0001444
+Residuals   101875    234                  
+Total          244 647902                  </code></pre>
 <p>The least-squares means are computed by submitting the <code>lm</code> object to <code>lsmeans()</code> from the <code>lsmeans</code> package. As there are two factors in this model, R must be told to compute the least-squares means separately by including the factor variable names separately in the <code>factors=</code> argument as such,</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">lsmeans</span>(lm2,~group)</code></pre>
 <pre><code> group    lsmean       SE  df lower.CL upper.CL
@@ -746,34 +726,36 @@ Linf  1.0000000 -0.9079803
 K    -0.9079803  1.0000000</code></pre>
 <hr />
 <pre><code>Reproducibility Information
-  Compiled Date: Tue May 12 2015
-  Compiled Time: 10:07:38 PM
-  Code Execution Time: 2.56 s
+  Compiled Date: Wed May 13 2015
+  Compiled Time: 7:49:12 PM
+  Code Execution Time: 2.48 s
 
   R Version: R version 3.2.0 (2015-04-16)
   System: Windows, i386-w64-mingw32/i386 (32-bit)
-  Base Packages: base, datasets, graphics, grDevices, methods, stats, utils
+  Base Packages: base, datasets, graphics, grDevices, grid, methods, stats,
+    utils
   Required Packages: FSA, car, lsmeans, nlstools and their dependencies
     (coda, dplyr, estimability, gdata, gplots, graphics, Hmisc, knitr,
     lmtest, MASS, methods, mgcv, multcomp, mvtnorm, nnet, pbkrtest,
     plotrix, plyr, quantreg, relax, sciplot, stats)
-  Other Packages: car_2.0-25, estimability_1.1, FSA_0.6.13, knitr_1.10.5,
-    lsmeans_2.17, nlstools_1.0-1, rmarkdown_0.6.1
+  Other Packages: car_2.0-25, estimability_1.1, Formula_1.2-1, FSA_0.6.13,
+    FSAdata_0.1.9, ggplot2_1.0.1, Hmisc_3.16-0, Kendall_2.2, knitr_1.10.5,
+    lattice_0.20-31, lsmeans_2.17, multcomp_1.4-0, mvtnorm_1.0-2,
+    NCStats_0.4.3, nlstools_1.0-1, plotrix_3.5-11, rmarkdown_0.6.1,
+    survival_2.38-1, TH.data_1.0-6
   Loaded-Only Packages: acepack_1.3-3.3, assertthat_0.1, bitops_1.0-6,
-    caTools_1.17.1, cluster_2.0.1, coda_0.17-1, codetools_0.2-11,
-    colorspace_1.2-6, DBI_0.3.1, digest_0.6.8, dplyr_0.4.1, evaluate_0.7,
-    foreign_0.8-63, formatR_1.2, Formula_1.2-1, gdata_2.16.1,
-    ggplot2_1.0.1, gplots_2.17.0, grid_3.2.0, gridExtra_0.9.1,
-    gtable_0.1.2, gtools_3.4.2, highr_0.5, Hmisc_3.16-0, htmltools_0.2.6,
-    KernSmooth_2.23-14, lattice_0.20-31, latticeExtra_0.6-26, lme4_1.1-7,
+    boot_1.3-16, caTools_1.17.1, cluster_2.0.1, coda_0.17-1,
+    codetools_0.2-11, colorspace_1.2-6, DBI_0.3.1, digest_0.6.8,
+    dplyr_0.4.1, evaluate_0.7, foreign_0.8-63, formatR_1.2, gdata_2.16.1,
+    gplots_2.17.0, gridExtra_0.9.1, gtable_0.1.2, gtools_3.4.2, highr_0.5,
+    htmltools_0.2.6, KernSmooth_2.23-14, latticeExtra_0.6-26, lme4_1.1-7,
     lmtest_0.9-33, magrittr_1.5, MASS_7.3-40, Matrix_1.2-0, mgcv_1.8-6,
-    minqa_1.2.4, multcomp_1.4-0, munsell_0.4.2, mvtnorm_1.0-2,
-    nlme_3.1-120, nloptr_1.0.4, nnet_7.3-9, parallel_3.2.0, pbkrtest_0.4-2,
-    plotrix_3.5-11, plyr_1.8.2, proto_0.3-10, quantreg_5.11,
-    RColorBrewer_1.1-2, Rcpp_0.11.6, relax_1.3.15, reshape2_1.4.1,
-    rpart_4.1-9, sandwich_2.3-3, scales_0.2.4, sciplot_1.1-0, SparseM_1.6,
-    splines_3.2.0, stringi_0.4-1, stringr_1.0.0, survival_2.38-1,
-    TH.data_1.0-6, tools_3.2.0, yaml_2.1.13, zoo_1.7-12</code></pre>
+    minqa_1.2.4, munsell_0.4.2, nlme_3.1-120, nloptr_1.0.4, nnet_7.3-9,
+    parallel_3.2.0, pbkrtest_0.4-2, plyr_1.8.2, proto_0.3-10,
+    quantreg_5.11, RColorBrewer_1.1-2, Rcpp_0.11.6, relax_1.3.15,
+    reshape2_1.4.1, rpart_4.1-9, sandwich_2.3-3, scales_0.2.4,
+    sciplot_1.1-0, SparseM_1.6, splines_3.2.0, stringi_0.4-1,
+    stringr_1.0.0, tools_3.2.0, yaml_2.1.13, zoo_1.7-12</code></pre>
 <hr />
 <div class="references">
 <h2>References</h2>

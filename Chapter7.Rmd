@@ -309,7 +309,6 @@ anova(lm4)
 ```
 
 
-
 --------------------------------------------------------------
 
 ```{r echo=FALSE}
@@ -318,9 +317,8 @@ reproInfo(rqrdPkgs=rqrd,elapsed=et["user.self"]+et["sys.self"])
 ```
 
 ```{r echo=FALSE, results='hide', message=FALSE}
-purl2("Chapter4.Rmd",moreItems=c("source","rqrd","stime"))    # Will create the script file
+purl2("Chapter7.Rmd",moreItems=c("source","rqrd","stime"))    # Will create the script file
 ```
-
 
 --------------------------------------------------------------
 ## References

@@ -166,4 +166,4 @@ tvb <- nls(Fvbmdl,start=Fsv,data=d6)
 overview(tvb)
 
 
-# Script created at 2015-05-12 22:07:38
+# Script created at 2015-05-13 19:49:12

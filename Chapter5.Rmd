@@ -242,7 +242,7 @@ The parameter $a$ is the intercept determined from the ageing-structure radius a
 
 Because we are using scales to back-calculate length at age, we will likely require a correction factor.  Because we did not collect empirical data or find information in the literature regarding the length of scale formation in Spotted Sucker, then we must estimate this parameter by modeling the known relationship between ageing-structure radius and fish-length at capture from our Spotted Sucker data set.  Even had we found this information in the literature, performing the below calculations is another good way to check one's data.
 
-The regression of length at age $i$ on scale radius at age $i$ as described in Box 5.2 of the text is conducted with `lm()` with a formula of the form `response`\verb+~+`explanatory` as the first argument and the data frame containing the variables in `data=`.  The ANOVA table and estimated coefficients, among other statistics, are extracted from the saved `lm` object with `anova()` and `summary()`, respectively.
+The regression of length at age $i$ on scale radius at age $i$ as described in Box 5.2 of the text is conducted with `lm()` with a formula of the form `response`~`explanatory` as the first argument and the data frame containing the variables in `data=`.  The ANOVA table and estimated coefficients, among other statistics, are extracted from the saved `lm` object with `anova()` and `summary()`, respectively.
 ```{r}
 lm1 <- lm(LiDL~Si2,data=d2)
 anova(lm1)

@@ -247,4 +247,4 @@ summary(mr1,parm="phi")
 confint(mr1,parm="phi")
 
 
-# Script created at 2015-05-13 19:01:57
+# Script created at 2015-05-13 19:49:45
