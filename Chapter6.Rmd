@@ -1,0 +1,570 @@
+---
+title: "AIFFD Chapter 6 - Mortality"
+author: "Derek H. Ogle"
+csl: american-fisheries-society.csl
+output:
+  html_document:
+    fig_height: 4.5
+    fig_width: 4.5
+    highlight: tango
+    number_sections: yes
+    pandoc_args: --number-offset=6
+    toc: yes
+    toc_depth: 2
+  pdf_document:
+    fig_height: 3
+    fig_width: 3
+    number_sections: yes
+    pandoc_args: --number-offset=6
+    toc: yes
+    toc_depth: 2
+bibliography: AIFFDReferences.bib
+---
+\setcounter{section}{6}
+
+```{r echo=FALSE, include=FALSE}
+stime <- proc.time()    # Start time to get processing time
+source('knitr_setup.R')
+```
+
+--------------------------------------------------------------
+
+This document contains R versions of the boxed examples from **Chapter 6** of the "Analysis and Interpretation of Freshwater Fisheries Data" book.  Some sections build on descriptions from previous sections, so each section may not stand completely on its own.  More thorough discussions of the following items are available in linked vignettes:
+
+* the use of linear models in R in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/),
+* differences between and the use of type-I, II, and III sums-of-squares in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/), and
+* the use of "least-squares means" is found in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/).
+
+
+The following additional packages are required to complete all of the examples (with the required functions noted as a comment and also noted in the specific examples below).
+
+```{r echo=-1, warning=FALSE, message=FALSE}
+rqrd <- c("FSA","car")
+library(FSA)       # Summarize, Subset, binCI, rcumsum, catchCurve, chapmanRobson, mrOpen
+library(car)       # Anova
+```
+
+In addition, external tab-delimited text files are used to hold the data required for each example.  These data are loaded into R in each example with `read.table()`.  Before using `read.table()` the working directory of R must be set to where these files are located on **your** computer.  The working directory for all data files on **my** computer is set with
+
+```{r}
+setwd("C:/aaaWork/Web/fishR/BookVignettes/aiffd2007")
+```
+
+In addition, I prefer to not show significance stars for hypothesis test output, reduce the margins on plots, alter the axis label positions, and reduce the axis tick length.  In addition, contrasts are set in such a manner as to force R output to match SAS output for linear model summaries.  All of these options are set with
+```{r eval=FALSE}
+options(width=90,continue=" ",show.signif.stars=FALSE,
+        contrasts=c("contr.sum","contr.poly"))
+par(mar=c(3.5,3.5,1,1),mgp=c(2.1,0.4,0),tcl=-0.2)
+```
+
+
+
+## Basic Mortality Computations
+The calculations in Box 6.1 do not rely on SAS- or R-specific code.  However, I will reproduce the calculations below to illustrate how R can be used as a calculator.
+
+Take, for example, a hypothetical fish population consisting of a single age-group. At the start of a 12-month interval, the age-group consists of 1000 individuals, and at the end it has been reduced by mortality to 700. For this example,
+```{r}
+N0 <- 1000                       # Initial population
+N12 <- 700                       # Final population
+( d <- N0-N12 )                  # Interval absolute mortality (i.e., number of deaths)
+A12 <- d/N0                      # Interval (12 month) mortality rate
+100*A12
+( Z12 <- -log(1-A12) )           # Instantaneous mortality rate
+```
+
+Now, suppose we wish to know the fraction of the population remaining, the number of individuals, and the number of deaths at the end of 4 and 8 months intervals. For this, $Z_{12}$ must be partitioned into 4-month ($Z_{4}$) and 8-month ($Z_{8}$) estimates as
+```{r}
+Z1 <- Z12/12                     # Monthly instantaneous mortality rate
+( Z4 <- 4*Z1 )                   # Four-month Z estimate
+( Z8 <- 8*Z1 )                   # Eight-month Z estimate
+```
+
+Interval mortality rates during the 4-month ($A_{4}$) and 8-month ($A_{8}$) intervals are then calculated as
+```{r}
+( A4 <- 1-exp(-Z4) )             # Interval (4-month) mortality rate
+( A8 <- 1-exp(-Z8) )             # Interval (8-month) mortality rate
+```
+
+Note, below, the use of `round()` to round the results to a specified number of decimal places.  This function requires two arguments -- the value(s) to be rounded as the first argument and the number of decimal places as the second argument.
+
+Numbers of individuals remaining (survival) after 4 months ($N_{4}$) and 8 months ($N_{8}$) are represented by
+```{r}
+d4 <- N0*A4                      # Deaths in first four-months
+round(d4,0)
+N4 <- N0-d4                      # Estimated survivors after 4-months
+round(N4,0)
+d8 <- N0*A8                      # Deaths in first eight-months
+round(d8,0)
+N8 <- N0-d8                      # Estimated survivors after 4-months
+round(N8,0)
+d8.4 <- d8-d4                    # Deaths in second four-months
+round(d8.4,0)
+d12.8 <- d-d8                    # Deaths in third four-months
+round(d12.8,0)
+```
+
+The code below is a check of our work.
+```{r}
+d4+d8.4+d12.8                    # Total deaths in the three four-month periods
+(d4+d8.4+d12.8) == d             # Does this equal the first deaths calculation?
+```
+
+
+## Heincke's Method of Estimating Annual Mortality
+From a reservoir, a large random sample of Spotted Bass (*Micropterus punctulatus*) was collected with electrofishing gear, and fish age was determined by inspecting otoliths. The number of fish in each age-class is given in the table in the text.  There was some disagreement over the ages of the four largest and oldest fish, but they were all at least 7 years of age, so the data were coded accordingly. The low catch of age-1 fish relative to age-2 fish suggested that age-1 fish were not fully recruited to the electrofishing gear.
+
+### Preparing Data
+The data for this box is very simple -- number of fish in seven age-classes.  Because of this simplicity the data can simply be entered into R using `c()` (for concatenation).  The data could have been entered into an external file and read into R (I demonstrate this in [Box 6.3](#robson-and-chapmans-maximum-likelihood-estimation-of-survival)).  The data for this box are entered into two vectors below.  Note that the colon on `1:7` constructs a sequence of all integers between 1 and 7 inclusive and that `c()` concatenates or combines the numbers in parentheses into a single vector.
+```{r}
+age <- 1:7
+catch <- c(257,407,147,32,17,5,4)
+rbind(age,catch)                        # for display purposes only.
+```
+
+### Heincke's Method
+The author's of the box limited the first calculation to only those fish that were age-2 or older.  With this constraint the annual mortality calculation requires the total number of fish that were age-2 and older.  In this example, the catch of fish age-2 and older can be found in positions two through seven of the `catch` vector.  Certain positions of a vector can be obtained by appending the desired positions within square brackets immediately after the name of the vector.  Asking for certain positions of the `catch` vector are illustrated below.
+```{r}
+catch[2]                         # 2nd position
+catch[c(2,4)]                    # 2nd & 4th positions
+catch[2:4]                       # 2nd through 4th positions
+catch[-2]                        # all but the 2nd position
+```
+
+The total catch of age-2 and older fish is isolated below and submitted to `sum()` to find the total catch for ages 2 to 7.  The annual mortality rate is then the number of age-2 fish divided by this total (i.e., the proportion of all fish age-2 and older that were age-2).  The standard error for the estimate of $A$ is computed given the formula in the text.
+```{r}
+( N <- sum(catch[2:7]) )         # sum in positions 2 thru 7
+( A <- 100*catch[2]/N )          # annual mortality estimate
+( se.A <- sqrt(A*(100-A)/N) )    # SE of A
+```
+
+The Heincke method essentially computes the proportion of a certain age out of a total number in an age range.  This is the same as computing a binomial proportion -- in fact the SE computed above is based on binomial theory.  A confidence interval for a binary proportion can be computed with `binCI()` from the `FSA` package.  This function requires the number of "successes" (i.e., the age in question) as the first argument and the total number of trials (i.e., all fish in the age categories) as the second argument.
+```{r}
+100*binCI(catch[2],N)            # default 95% CI for A
+```  
+
+### Heincke's Method (Alternative)
+The authors of the box mention that the estimated annual mortality rate, using the method above, for age-3 and older fish is 72%.  This begs the question of whether there is an efficient method of computing the estimated annual mortality rate for each age (and older).  Fortunately, this can be accomplished fairly efficiently with `rcumsum()` from the `FSA` package.  This function computes the reverse cumulative summation for a vector.  In other words, it will compute the total number of fish age-1 and older, then the total number of fish age-2 and older, then age-3 and older, etc.  The reverse cumulative sums can be computed and saved to an object so that the estimated annual mortality rates can be calculated by dividing the `catch` vector by these reverse cumulative sums vector and the CIs can be computed quickly with `binCI`.
+```{r}
+( N <- rcumsum(catch) )
+100*catch/N
+100*binCI(catch,N)
+data.frame(age,catch,N,A=100*catch/N,100*binCI(catch,N))  # combine for display only
+```
+
+
+## Robson and Chapman's Maximum-Likelihood Estimation of Survival
+Assume that all the fish in a large sample were aged and the numbers of fish in each age-class were tallied, as shown in the table in the text.  Along with constant (or near constant) recruitment and survival rates, the assumption of equal vulnerability to capture must be met.  A cursory examination of the catch-at-age data suggests that the two youngest age-groups were not fully vulnerable, or recruited, to the gear (i.e., the curve does not truly begin to descend until age-3); therefore, the analysis will apply to only age-3 and older fish.  The first step is to code each age, starting with zero for the youngest age considered fully recruited (i.e., age-3).
+
+### Preparing Data
+The [Box6_3.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box6_3.txt) is read and observed below.  Note that these data are so simple that they could have been entered directly into vectors in R as illustrated in [Box 6.2](#heinckes-method-of-estimating-annual-mortality).
+```{r}
+( d3 <- read.table("data/Box6_3.txt",header=TRUE) )
+```
+
+### Chapman-Robson's Method
+The maximum-likelihood method for estimating the rate of survival proposed by @ChapmanRobson1960 and @RobsonChapman1961 is implemented with `chapmanRobson()` from the `FSA` package.  This function requires an R formula of the form `catches`\verb+~+`ages`, where `catches` generically represents the vector of catch numbers and `ages` generically represents the vector of ages, as the first argument, the data frame from which those vectors are drawn as the second (or `data=`) argument and a vector of the fully recruited ages as the third (or `ages2use=`) argument.  The ages of fully recruited fish can be identified with a full range (e.g., `3:10`) or a concatenated list of ages (e.g., `c(3,4,5,6,7,8,9,10)`).  The best estimates (with SEs) of the annual survival $S$ and instantaneous mortality $Z$ rates are extracted from the saved `chapmanRobson` object with `summary()`, the 95% confidence intervals for the two parameters are extracted with `confint()`, and a plot depicting the Chapman-Robson calculations is obtained with `plot()` (Note that the results shown here and those shown in the text differ slightly because more precision is used here on intermediate calculations).
+
+```{r}
+cr1 <- chapmanRobson(d3$age,d3$catch,3:10)
+summary(cr1)
+confint(cr1)
+plot(cr1)
+```
+
+
+## Mortality Rates from the Slope of Regression Line
+The catch-at-age data shown in [Box 6.3](#robson-and-chapmans-maximum-likelihood-estimation-of-survival) and Figure 6.2 (in the text) is used again here.  The catch-curve analysis is limited to those ages considered fully recruited to the gear (age-3 and older).  At least five fish in the oldest age-class are present, so the mortality rate will apply to ages 3-10.  Using least-squares regression, the slope of the line describing the relation between the natural log of number (y-variable) and age (x-variable) can be calculated longhand, by means of a spreadsheet, or with the R code below.
+
+### Preparing Data
+The same data used in [Box 6.3](#robson-and-chapmans-maximum-likelihood-estimation-of-survival) are used here with the exception that a variable that is the natural log of the `catch` is added to the data frame.
+```{r}
+d3$logcatch <- log(d3$catch)
+str(d3)
+```
+
+### The Catch-Curve Method -- First Principles
+#### Unweighted Regression
+Linear regressions in R are performed with `lm()` where the first argument is a formula of the form `y`\verb+~+`x` and the second (`data=`) argument is the data frame in which the variables can be found.  An optional third (`subset=`) argument can be used to efficiently create a subset of a data frame to be used for that particular linear model.  This argument is particularly important in catch-curve analyses because it can be used to limit the analysis to only those ages that appear to be fully recruited to the gear.  In this example, the authors have determined that all fish age-3 and older are fully recruited and should be used to estimate the mortality rate.  The ANOVA table is extracted from the saved `lm` object with `anova()`, the parameter estimates are extracted with `summary()`, and default 95% CIs for the parameters are extracted with `confint()`.
+```{r}
+cc1 <- lm(logcatch~age,data=d3,subset=age>=3)
+anova(cc1)
+summary(cc1)
+confint(cc1)
+```
+
+As noted in the box, the estimate of the instantaneous mortality rate ($Z$) is obtained from the estimated slope.  The parameters are isolated from the saved `lm` object with `coef()`, and, because the slope is the second value in the returned vector it can be isolated by appending an `[2]`.  The confidence interval for the slope is in the second row of the matrix returned by `confint()`; thus, the CI for the slope can be isolated by appending an `[2,]`.  Note the use of the negative sign to convert the negative slope into a positive $Z$ value.
+```{r}
+( Z <- -coef(cc1)[2] )        # 2nd coefficient of model results
+( ZCI <- -confint(cc1)[2,] )  # 2nd row of confint results
+```
+
+The isolated instantaneous mortality results from above are used to effectively find estimates for the annual mortality rate ($A$) using the $A=1-e^{-Z}$ formula.
+```{r}
+( A <- 100*(1-exp(-Z)) )
+( ACI <- 100*(1-exp(-ZCI)) )
+```
+
+#### Weighted Regression
+As noted in the box the predictions from the unweighted regression fit above can be stored and used as weights in the catch-curve analysis to minimize the effect of few fish in the older age classes on the regression results.  Making these predictions is simple but using them is slightly complicated because of the subsetting required for the catch-curve regression.  The easiest way to handle this slight complexity is to predict log catches for all ages, attach these to the original data frame, and then use the same subsetting routine.  Predictions are made with `predict()` which requires the fitted model as the first argument and a data frame that has a variable that is named exactly as the variable in the model as the second argument.  Thus, the predictions for all ages in the original data frame is made and appended to the original data frame as shown below.
+```{r}
+d3$W <- predict(cc1,d3)
+d3
+```
+
+The second weighted regression is then fit with `lm()` exactly as before except that the weights just created are identified in the `weights=` argument.,
+```{r}
+cc2 <- lm(logcatch~age,data=d3,subset=age>=3,weights=W)
+anova(cc1)
+summary(cc2)
+( Z <- -coef(cc2)[2] )
+( ZCI <- -confint(cc2)[2,] )
+```
+
+### The Catch-Curve Method -- Simpler Function
+The methods described above are implemented with `catchCurve()` from the `FSA` package.  This function requires the same first three arguments as described for `chapmanRobson()` in [Box 6.3](#robson-and-chapmans-maximum-likelihood-estimation-of-survival).  Note that the original, not logged, catches are given in this function.  In addition, the weighted regression can be performed by including `use.weights=TRUE`.  Specific information can be extracted from the results in the `catchCurve()` object as described for `chapmanRobson()` in [Box 6.3](#robson-and-chapmans-maximum-likelihood-estimation-of-survival).
+```{r}
+cc3 <- catchCurve(catch~age,d3,3:10)                    # unweighted catch-curve
+anova(cc3)
+summary(cc3)
+confint(cc3)
+plot(cc3)
+```
+
+The weighted regression is fit as shown below.
+```{r}
+cc4 <- catchCurve(catch~age,d3,3:10,use.weights=TRUE)   # weighted catch-curve
+summary(cc4)
+confint(cc4)
+```
+
+
+## Adjusting Catch-at-Age Data for Unequal Recruitment
+Trap-netting of White Crappies (*Pomoxis annularis*) in a Midwestern reservoir in the spring of 2001 provided information on the standing age structure for the 281 fish collected representing six age-classes.  Previous studies indicated that all ages were recruited to the trap nets, so the goal was to calculate instantaneous mortality between ages 1 and 6.  The catch-at-age data clearly indicated that recruitment varied widely among years, and therefore one of the assumptions of catch-curve analysis was violated.  It was assumed that the trap-net catches accurately indexed recruitment variability, and these data were used to create an index of year-class strength ($l_{i}$) for each $i$ year as $l_{i} = \frac{r_{i}}{r_{L}}$, where $r_{i}$ = number of age-0 fish collected with trap nets in year $i$, and $r_{L}$ = lowest number of age-0 fish collected during the time series.  The index was used to adjust the representation of each year-class $N_{i}$ in spring 2001 to a constant recruitment as $\frac{N_{i}}{l_{i}}$. 
+
+### Preparing Data
+The [Box6_5.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box6_5.txt) is read and the structure is  observed below.  The authors also added several variables to the original data frame.  First, age is computed by subtracting the fish's `year.class` from the capture year (2001).  As suggested in the box, an index of year-class strength is created by dividing the annual capture of age-0 fish (i.e., `age0`) by the minimum annual capture of age-0 fish in all years (as found with `min()`).  The catch of fish in each age-class is then adjusted by dividing the observed trap-net catch by the index of year-class strength.
+
+```{r}
+d5 <- read.table("data/Box6_5.txt",header=TRUE)
+str(d5)
+d5$age <- 2001-d5$year.class         # find age
+d5$ycs <- d5$age0/min(d5$age0)       # create year-class strength
+d5$adjcatch <- d5$catch/d5$ycs       # adjust catch for year-class strength
+d5                                   # now, what does the data frame look like
+```
+
+                                  
+### Fitting Catch-Curve Method
+The table of the data (shown in the text and above) shows that all adjusted catches appear to be on the descending limb of the catch-curve and, thus, should be used in the regression to estimate the instantaneous mortality rate.  The catch-curve model is fit with `catchCurve()` as described in BOX 6.4, but noting that leaving the third argument to `catchCurve()` blank tells R to use all ages in the analysis (These results are very slightly different from what is shown in Box 6.5 in the text.  This is likely due to rounding but it is unclear if this is the reason as enough computational detail is not shown in Box 6.5 in the text).
+```{r}
+cc1 <- catchCurve(adjcatch~age,data=d5)
+summary(cc1)
+confint(cc1)
+plot(cc1)
+```
+
+### Ogle Comment
+It makes more sense to me to compute a so-called *year-class correction factor* by dividing the maximum observed catch by each of the individual catches-at-age (as found with `max()`).  These values then represent how many times smaller that year-class is then the maximum observed year-class.  If each catch is then multiplied by this value, it inflates the smaller year-classes "up to" the size of the largest year-class.
+```{r}
+d5$yccf <- max(d5$age0)/d5$age0
+d5$adjcatch2 <- d5$catch*d5$yccf
+d5                                   # now, what does the data frame look like
+```
+
+The catch-curve model is then fit exactly as above (but with the new adjusted catch).  A comparison of these results with the results from above shows that it does not make any difference which "adjustment" method you use.  In fact, "re-scaling" to any constant value -- minimum catch, maximum catch, mean catch, or 100 -- will result in the same estimated instantaneous mortality rate because the slope of the regression is invariant to linear transformations of the data (all of these "scales" only differ by a constant ratio).
+```{r}
+cc2 <- catchCurve(adjcatch2~age,data=d5)
+summary(cc2)
+```
+
+As a final example of invariance property, examine the results below from scaling to the mean catch (as found with `mean()`).
+```{r}
+d5$yccf2 <- mean(d5$age0)/d5$age0
+d5$adjcatch3 <- d5$catch*d5$yccf2
+cc3 <- catchCurve(adjcatch3~age,data=d5)
+summary(cc3)
+```
+
+
+
+## Comparing Instantaneous Mortality Rates from Catch Curves
+Comparing instantaneous mortality rates ($Z$) for two or more populations is equivalent to comparing the slopes of the catch-curve regression lines.  In the text are catch-at-age data for two populations that fully recruited to the gear at age-2.  The R code to calculate and compare the slopes of the catch-curve regression lines is given below.
+
+### Preparing Data
+The [Box6_6.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box6_6.txt) is read and the structure is  observed below.  The natural log of the catches, which is required for the catch curve regression, is appended to the data frame.
+```{r}
+d6 <- read.table("data/Box6_6.txt",header=TRUE)
+str(d6)
+d6$logcatch <- log(d6$catch)
+```
+
+### ANCOVA to Determine if $Z$ Differs Between Lakes
+The method described in the box is the same as the ANCOVA discussed for Box 3.11 in the [Chapter 3 Vignette](https://fishr.wordpress.com/books/aiffd/) and is fit with `lm()`.  Also note that `subset=` argument is used to restrict the model to only age-2 and older fish (the authors note that fish age-2 and older are fully recruited to the gear).  The type-I SS ANOVA table is extracted from the saved `lm` object with `anova()`, whereas the type-III and type-II SS ANOVA tables are extracted with `Anova()` (from the `car` package) with the appropriate `type=` argument.  Because the interaction term is the last term in this model, all three types of SS provide the same p-value leading to the result that the interaction is insignificant.  An insignificant interaction indicates that the slope does not differ between the groups.  As the slope is directly related to the estimated instantaneous mortality rate ($Z$) this also suggests that there is no difference in $Z$ between the two lakes.  A plot of the fitted models to further illustrate this point is obtained with `fitPlot()` from the `FSA` package.
+```{r}                 
+lm1 <- lm(logcatch~age*lake,data=d6,subset=age>=2)
+anova(lm1)
+Anova(lm1,type="III")
+Anova(lm1,type="II")
+fitPlot(lm1,main="")
+```
+
+```{r echo=FALSE, results='hide', }
+# for Sexpr below
+lm2 <- lm(logcatch~age,data=d6,subset=age>=2)
+```
+
+The overall estimate of the common instantaneous mortality rate is found by fitting a model to the combined data set (i.e., ignoring `lake`).  Thus, the overall instantaneous mortality rate is `r formatC(-coef(lm2)[2],digits=2,format="f")`.
+```{r}
+lm2 <- lm(logcatch~age,data=d6,subset=age>=2)
+anova(lm2)
+coef(lm2)
+confint(lm2)
+```
+
+
+
+## Cohort Catch Curves
+Spring electrofishing samples at 40 sites in Normandy Reservoir indicated that recruitment by Spotted Bass (*Micropterus punctulatus*) varied more than twofold among years @SammonsBettoli1998; therefore, analysis of cohort catch curves was employed.  The catch from the 1992 cohort in annual samples taken between 1993 and 1998 are shown in the text.  These and other data suggested that fish were not fully recruited to the gear until age-2.
+
+### Preparing Data
+The data were entered into a data frame using `data.frame()` below.
+```{r}
+( d7 <- data.frame(age=1:6,catch=c(65,66,27,6,4,1)) )
+```
+
+### Chapman-Robson Method
+The code below analyzes these data with `chapmanRobson()` as shown in [Box 6.3](#robson-and-chapmans-maximum-likelihood-estimation-of-survival).  Note that the authors suggest that age-2 and older fish are recruited to the gear.
+
+```{r}
+cr1 <- chapmanRobson(catch~age,d7,2:6)
+summary(cr1)
+confint(cr1)
+plot(cr1)
+```
+
+### Catch-Curve Method
+The code below analyzes these data with `catchCurve()` as shown in [Box 6.4](#mortality-rates-from-the-slope-of-regression-line).  Note that the authors also note (correctly) that the last age should not be used in the catch curve analysis because of the very small sample size.
+```{r}
+cc1 <- catchCurve(catch~age,d7,2:5)
+summary(cc1)
+confint(cc1)
+plot(cc1)
+```
+
+
+## Mortality Estimation with Length-Based Models
+We use a Largemouth Bass (*Micropterus salmoides*) data set from Columbus Lake, Mississippi, to illustrate mortality computations from length-based models. The von Bertalanffy model parameters ($K$ and $L_\infty$) were available from a parallel study in Columbus Lake and were $K$=0.226 and $L_\infty$=636 mm (see Chapter 5 for calculations).  All Largemouth Bass 150mm or longer were considered equally vulnerable to the collection gear (electrofishing); thus, $L_{x}$=150 mm. The mean and median length of fish 150 mm or longer in the data set were $L_{mean}$=260 mm and $L_{median}$=255 mm. 
+
+### Ogle Comment
+The raw data for the example in the box does not exist.  Indeed enough information is given in that box to complete the calculations but most of that information in in summarized form.  A reasonable approximation of the length data can be made from the results shown for the length frequency graph.  The code here shows how I simulated those data.  The age data that would be required to estimate $L_\infty$ and $K$ cannot be simulated from the given information.
+
+The basic idea is to "expand" the counts of individuals in each of the 1-cm length bins to the value at the low end of the bin and then add a random "millimeter" component to simulate data recorded to millimeters.  I will begin this process by entering the length bins (lower-value of the bin) and the frequency in the bins into two vectors (`bins`) and `freqs`).  I then check the length of these vectors (i.e. number of numbers in the vector) to make sure that they at least match (I don't trust myself!)
+```{r}
+bins <- 9:52
+freqs <- c(5,39,43,55,64,86,106,99,82,81,56,45,27,36,43,52,65,73,63,42,44,40,37,31,36,
+           15,19,18,13,8,20,19,9,12,9,11,13,13,4,10,6,3,3,4)
+length(bins)
+length(freqs)
+```
+
+A vector of the "floor" measurement for each fish (i.e., the lowest whole cm) is created by repeating each value in the `bins` vector the number of times shown in the `freqs` vector.  These repetitions are constructed with `rep()`.  A table of these values is then created to see if they match the summary information in the box.  As they did, I then multiple the values by 10 to convert the cm to mm.
+```{r}
+len.cm <- rep(bins,times=freqs)
+table(len.cm)
+len.mm <- len.cm*10
+```
+
+I then set the random number seed so that you could reproduce the exact same results that I have produced.
+```{r}
+set.seed(2101)
+```
+
+The `sample()` function is then used to construct as many random integers from between 0 and 9 (first argument) as there are values in the `len.mm` vector (note that sampling from 0:9 must be done with replacement; i.e., use of `replace=TRUE`). and then added to the `len.mm` vector,
+```{r}
+rands <- sample(0:9,length(len.mm),replace=TRUE)
+len.mm <- len.mm + rands
+```
+
+The values in `len.mm` now contain random data that appears to have been measured to the nearest mm, but when summarized in a length-frequency graph by 10-mm bins should match the results shown in the box.
+```{r}
+hbins <- seq(90,530,by=10)
+h <- hist(len.mm,breaks=hbins,right=FALSE,col="gray90",main="")
+h$mids
+h$counts
+```
+
+Finally, these simulated data were written out to a text file for use below as if the data had been entered and read from an external data file and not simulated in this manner.
+```{r eval=FALSE}
+write.table(data.frame(len=len.mm),"Box6_8.txt",quote=FALSE,row.names=FALSE,col.names=TRUE)
+```
+
+### Preparing Data
+The [Box6_8.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box6_8.txt) is read and the structure is observed below.  Note that the authors restricted their analysis to fish 150-mm and larger because those fish were fully recruited to the gear.  A new data frame with just these fish is constructed with `Subset()` where the first argument is the original data frame name and the second argument is a conditioning statement for the subset.
+```{r}
+d8 <- read.table("data/Box6_8.txt",header=TRUE)
+str(d8)
+d8a <- Subset(d8,len>=150)
+str(d8a)
+```
+
+### Beverton-Holt Method for Estimating $Z$ from Mean Length
+The authors illustrate the use of equation 6.8 to estimate $Z$.  This method requires knowledge of $L_{\infty}$ and $K$ from the von Bertalanffy growth model (see Box 5.4 in the [Chapter 5 vignette](https://fishr.wordpress.com/books/aiffd/) for how to fit a von Bertalanffy model to length-at-age data).  In this box, the given summary information is stored into two objects and the mean (using `mean()`) and minimum (using `min()`) lengths are found and stored into two objects.  Thus, the instantaneous mortality ($Z$) using equation 6.8 is estimated in the last line below.
+```{r}
+Linf <- 636
+K <- 0.226
+( Lmean <- mean(d8a$len) )
+( Lmin <- min(d8a$len) )
+( Z1 <- K*(Linf-Lmean)/(Lmean-Lmin) )
+```
+
+### Hoenig Method for Estimating $Z$ from Median Length
+@Hoenig1983 modified Beverton and Holt's method to produce equation 6.9 in the text.  This method still requires $L_{\infty}$, $K$, and $L_{minimum}$ but it also requires the median length (as found with `median()`.  The instantaneous mortality ($Z$) using equation 6.9 is estimated in the last line below using two intermediate calculations in the previous two lines.
+```{r}
+( Lmedian <- median(d8a$len) )
+Ymedian <- -log(1-Lmedian/Linf)
+Ymin <- -log(1-Lmin/Linf)
+( Z2 <- 0.693*K / (Ymedian-Ymin) )
+```
+
+### Estimating $Z$ from Length-Converted Catch Curve
+Estimating $Z$ from a length-converted catch curve as described by @Pauly1984 requires finding the midpoint of length bins and the number of fish in each of those bins.  In essence, one needs to know the basic calculations for constructing a length-frequency histogram.  In R, histograms are constructed with `hist()`.  This function only requires a vector of values to construct the histogram as the first argument.  However, you can control the bins used by the histogram algorithm by sending break points for the bins to the `breaks=` argument.  In addition, `hist()` defaults to the bins being right-inclusive -- i.e., a value of 10 would be included in the 9-10 bin rather than the 10-11 bin -- whereas most fisheries biologists are used to using left-inclusive bins.  Left-inclusive bins can be used by including the `right=FALSE` argument to `hist()`.  In the example below, left-inclusive bins that start at 150-mm, end at 530-mm, and are 10-mm wide were created.  The histogram was then constructed, but it was also saved to an object (`h`).  The midpoint values and the counts in each bin are extracted by appending `$mids` and `$counts`, respectively, to the saved `hist` object, as illustrated below.
+```{r}
+bins <- seq(150,530,by=10)
+h <- hist(d8a$len,breaks=bins,right=FALSE,xlab="Total Length (mm)",main="",col="gray90")
+h$mids
+h$counts
+```
+
+The midpoint values are converted to t-prime values as illustrated in the text and the counts were log-transformed.
+```{r}
+tprime <- -log(1-h$mids/Linf)
+round(tprime,3)                # rounded only to compare to values in Box 6.8
+logN <- log(h$counts)
+```
+
+The linear regression denoted by equation 6.10 in the book is then fit with `lm()`.  The model coefficients are extracted with `coef()` and the slope (i.e., second coefficient in `coef()`) is isolated and saved to an object (`b`).  Finally, the instantaneous mortality is estimated from these values with the last line of code below.
+```{r}
+lm1 <- lm(logN~tprime)
+coef(lm1)
+( b <- coef(lm1)[2] )
+( Z3 <- K*(1-b) )
+```
+
+### Empirical Estimates of $L_{\infty}$ and $K$
+The authors (on page 249) provide three methods for estimating $L_{\infty}$ and $K$ if length-at-age data do not exist.  These methods are illustrated here.
+
+#### Three Largest Fish Method Estimate of $L_{\infty}$
+Finding the mean lengths of the three largest fish in the length vector is a bit of work, which is best shown in several steps -- (1) order the vector positions from smallest to largest fish, (2) find the positions of three largest fish, (3) find the lengths of those three fish, and (4) find the mean of those lengths.
+```{r}
+ord.len <- order(d8a$len)
+ord.top3 <- ord.len[(length(d8a$len)-2):length(d8a$len)]
+( len.top3 <- d8a$len[ord.top3] )
+( Lmean.top3 <- mean(len.top3) )
+```
+
+@Pauly1984 then suggests dividing this mean by 0.95 to produce an estimate of $L_{\infty}$.  This is dramatically lower then the $L_{\infty}$ provided by the authors.
+```{r}
+( Linf1 <- Lmean.top3/0.95 )
+```
+
+#### @FroeseBinohlan2000 Empirical Equation Method Estimate of $L_{\infty}$
+@FroeseBinohlan2000 developed an empirical equation for estimating $L_{\infty}$ from the maximum length observed for the population.  The equation is $log(L_{\infty})=0.044+0.984log(L_{max})$.  The maximum value in these data and the estimate of $L_{\infty}$ using this equation are shown below.  This is even more dramatically lower then the $L_{\infty}$ provided by the authors.
+```{r}
+( Lmax <- max(d8a$len) )
+( Linf2 <- exp(0.044+0.984*log(Lmax)) )
+```
+
+#### @Wetherall1987 Method Estimate of $L_{\infty}$
+The method of @Wetherall1987 requires knowing the lower limit of each length interval, which can be obtained by appending `$breaks` to the saved `hist` object from above.  In addition, the method requires knowing the mean lengths of all fish in each interval and all larger intervals.  For example, we must find the mean length of fish in the 150-mm and all larger intervals, in the 160-mm and all larger intervals, the 170-mm and all larger intervals, and so on.  This type of calculation is best handled with the loop shown below.  Finally, the difference between these means and the lower limit of the length intervals is computed and saved to an object.
+```{r}
+( Lx <- h$breaks )                             # lower limit of each TL interval
+Lmeans <- NULL                                 # initiate the Lmeans vector
+for (i in 1:length(Lx)) {                      # loop through length intervals
+  Lmeans <- c(Lmeans,mean(d8a$len[d8a$len>=Lx[i]]))
+}
+Lmeans                                         # mean for each interval & higher
+Ldiff <- Lmeans-Lx
+```
+
+The linear regression of these differences on the lower limits of the length intervals is then fit with `lm()` as usual.  The y-intercept and slope coefficients are isolated from the `coef()` similar to what was shown above.  These values are used to estimate $L_{\infty}$ as shown in the text below equation 6.11.  Again, this estimate is dramatically lower then the $L_{\infty}$ provided by the authors.
+```{r}
+lm2 <- lm(Ldiff~Lx)
+a <- coef(lm2)[1]      # isolate intercept
+b <- coef(lm2)[2]      # isolate slope
+( Linf3 <- -a/b )
+```
+
+
+
+## Total Mortality Estimation from Marked Recaptures
+A 5-year tagging program was completed to monitor mortality (as well as population size and recruitment which are not shown in this example) of Largemouth Bass (*Micropterus salmoides*) in Lake Travesty.  Fish were marked and recaptured annually during a 2-week collection period in spring each year, and results were analyzed with the Jolly-Seber Method.  The five year-history of marking and recaptures (preadjusted for tag loss) are shown in the table in the box in the text.
+
+### Ogle Comment
+The Jolly-Seber method is implemented with `mrOpen()` from the `FSA` package.  (The `mrOpen()` function and the Jolly-Seber method are discussed in much detail in [Chapter 8 of the Introductory Fisheries Analysis with R vignettes](https://fishr.wordpress.com/books/ifar/).  The presentation below will assume that you have read that vignette).  The biggest differences between the use of `mrOpen()` and what was described in the box is the use of Seber's modified formulas (see bottom of page 253 in AIFFD), the allowance for possible accidental deaths during the sampling process in `mrOpen()`, the transposition of the summary table shown in Table 6.2 of the chapter, and the use of different terminology.  The following table shows the equivalencies in terminology between `mrOpen()` and the box.
+
+AIFFD | `mrOpen()` | Meaning 
+----- | ---------- | -------
+$m_{i}$ | $n_{i}$ | Number of fish captured in the $i$th sample
+$r_{\cdot i}$ | $m_{i}$ | Number of marked fish recaptured in the $i$th sample.
+-- | $u_{i}$ | Number of UNmarked fish captured in the $i$th sample.
+$r_{ii}$ | $m_{ji}$ | Number of marked fish in the $i$th sample last caught in the $j$th sample.
+-- | $R_{i}$ | Number of marked fish returned to the population after the $i$th sample.
+$r_{i\cdot}$ | $r_{i}$ | Number of the fish released in the $i$th sample that are subsequently recaptured.
+$k_{i}$ | $z_{i}$ | Number of fish captured before the $i$th sample, not captured in the $i$th sample, but captured subsequently.
+$B^{*}_{i}$ | $M_{i}$ | Estimated number of marked fish in the population just prior to the $i$th sample.
+
+### Preparing Data
+The summarized catch data is provided in the box.  These results are entered into two matrices below.  For example, the $r_{ii}$ portion of the table on page 255 in the book is entered below.  Note that `rep()` is used to repeat the first argument by the number of times in the second argument and `rbind()` is used to "bind" together multiple vectors of the same length in a row-wise manner (i.e., each vector is a row in the resulting matrix).  Also note that the matrix has been entered as a square 5x5 matrix where the last column, not shown in the book table, containing all blanks is needed (i.e., this column is all blanks because the last sample is such that the fish released cannot be subsequently recaptured).  As noted above, this portion of the table is a transposition of the "top" portion of the "Method B" table required by `mrOpen()`.  In other words, the rows of this table should be the columns of the required table and vice versa.  Fortunately, the entire matrix can be easily transposed with `t()`.
+```{r}
+s1 <- rep(NA,5)
+s2 <- c(43,rep(NA,4))
+s3 <- c(28,31,NA,NA,NA)
+s4 <- c(12,16,48,NA,NA)
+s5 <- c(3,9,19,37,NA)
+( aiffd.top <- rbind(s1,s2,s3,s4,s5) )
+( mb.top <- t(aiffd.top) )
+```
+
+The "bottom" portion of the "Method B" table required by `mrOpen()` is constructed from some of the marginal values of the table shown in the text.  However, one must be very careful to note the different definitions as outlined in the table above.  Also note that the book table does not show what the sample size was in the last sample.  Thus, the only item known from the last sample is the number of observed marked (i.e., recaptured) fish.  Fortunately, this information is not required in the Jolly-Seber calculations.  However, `mrOpen()` requires non-negative values in the entire matrix which is accomplished below by entering $m$ for $n$ for the last sample.  This is purely a work-around for dealing with the missing information from the table in the box and the requirements of `mrOpen()`.
+```{r}
+n <- c(643,489,712,630,68)    # m_i_ from book
+m <- c(0,43,59,76,68)         # r_.i_ from book
+u <- n-m                      
+R <- n                        # assumes no accidental deaths, thus m_i_ from book
+( mb.bot <- rbind(m,u,n,R) )
+```
+
+### Performing Jolly-Seber Calculations
+The Jolly-Seber calculations are computed in R by submitting the top and bottom portions of the Method B table as the first two arguments to `mrOpen()` and submitting the return object to `summary()`.  If `verbose=TRUE` is used then the complete set of "observables" will be printed first.  The first three columns of this output is simply repeated from the bottom portion of the Method B table.  The last two columns are computed from the top portion of the Method B table and correspond to marginal columns of the table shown in the box (but make sure to note the different terminology).
+```{r}
+mr1 <- mrOpen(mb.top, mb.bot)
+summary(mr1,verbose=TRUE)
+```
+
+It was noted previously that `mrOpen()` uses the @Seber1965 modification to estimate the number of marks extant in the population (however, it does not add 1 to the $m_{i}$ term as shown in the text).  This is not the method illustrated in the box.  For comparisons purpose, the estimated number of extant marks can be calculated "by hand" using the formula for $B^{*}_{i}$ (without the additional 1 on the $m_{i}$ term) on the bottom of page 253,
+
+* $B^{*}_{3}$ = 59+(712+1)*40/(67+1) = 478.4118 = 478 = $M_{3}$
+* $B^{*}_{2}$ = 43+(489+1)*43/(56+1) = 412.6491 = 413 = $M_{2}$
+* $A_{2}$ = 1 - 478/(413-43+489) = 0.444
+
+Estimated survival rates are obtained by submitting the saved `mrOpen` object to `summary()` using the `parm="phi"` argument.  The mortality rates shown in the text are found by subtracting the "phi" estimates from 1.  Thus, for example $A_{2}$ = 1-$\phi_{2}$ = 1-0.557 = 0.443.  Confidence intervals for the survival estimates (phi) are obtained by submitting the `mrOpen` object to `confint()` using the `parm="phi"`.
+```{r}
+summary(mr1,parm="phi")
+confint(mr1,parm="phi")
+```
+
+
+--------------------------------------------------------------
+
+```{r echo=FALSE}
+et <- proc.time() - stime
+reproInfo(rqrdPkgs=rqrd,elapsed=et["user.self"]+et["sys.self"])
+```
+
+```{r echo=FALSE, results='hide', message=FALSE}
+purl2("Chapter6.Rmd",moreItems=c("source","rqrd","stime"))    # Will create the script file
+```
+
+
+--------------------------------------------------------------
+## References
