@@ -1,0 +1,565 @@
+---
+title: "AIFFD Chapter 11 - Assessment of Diets and Feeding Patterns"
+author: "Derek H. Ogle"
+csl: american-fisheries-society.csl
+output:
+  pdf_document:
+    fig_height: 3
+    fig_width: 3
+    number_sections: yes
+    pandoc_args: --number-offset=11
+    toc: yes
+    toc_depth: 2
+  html_document:
+    fig_height: 4.5
+    fig_width: 4.5
+    highlight: tango
+    number_sections: yes
+    pandoc_args: --number-offset=11
+    toc: yes
+    toc_depth: 2
+bibliography: AIFFDReferences.bib
+---
+\setcounter{section}{11}
+
+```{r echo=FALSE, include=FALSE}
+stime <- proc.time()    # Start time to get processing time
+source('knitr_setup.R')
+```
+
+--------------------------------------------------------------
+
+This document contains R versions of the boxed examples from **Chapter 11** of the "Analysis and Interpretation of Freshwater Fisheries Data" book.  Some sections build on descriptions from previous sections, so each section may not stand completely on its own.  More thorough discussions of the following items are available in linked vignettes:
+
+* the use of linear models in R in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/),
+* differences between and the use of type-I, II, and III sums-of-squares in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/), and
+* the use of "least-squares means" is found in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/).
+
+
+The following additional packages are required to complete all of the examples (with the required functions noted as a comment and also noted in the specific examples below).
+
+```{r echo=-1, warning=FALSE, message=FALSE}
+rqrd <- c("FSA","car","ggplot2","Hmisc","lattice","MASS","quantreg")
+library(FSA)          # Subset, fitPlot, ks2d2, ks2d2p, headtail
+library(car)          # Anova
+library(ggplot2)      # qplot, facet_grid
+library(Hmisc)        # rcorr
+library(lattice)      # xyplot
+library(MASS)         # manova
+library(quantreg)     # rq et al.
+```
+
+The G statistic used in [Box 11.1](#pooling-prey-items-as-a-single-resource) does not appear in base R or any package that I am aware of.  However, Dr. Peter Hurd has provided code on [his web page](http://www.psych.ualberta.ca/~phurd/cruft/) that performs this analysis.  This function can be loaded into R as follows.
+```{r}
+source("http://www.psych.ualberta.ca/~phurd/cruft/g.test.r")
+```
+
+In addition, external tab-delimited text files are used to hold the data required for each example.  These data are loaded into R in each example with `read.table()`.  Before using `read.table()` the working directory of R must be set to where these files are located on **your** computer.  The working directory for all data files on **my** computer is set with
+```{r}
+setwd("C:/aaaWork/Web/fishR/BookVignettes/aiffd2007")
+```
+
+In addition, I prefer to not show significance stars for hypothesis test output, reduce the margins on plots, alter the axis label positions, and reduce the axis tick length.  In addition, contrasts are set in such a manner as to force R output to match SAS output for linear model summaries.  All of these options are set with
+```{r eval=FALSE}
+options(width=90,continue=" ",show.signif.stars=FALSE,
+        contrasts=c("contr.sum","contr.poly"))
+par(mar=c(3.5,3.5,1,1),mgp=c(2.1,0.4,0),tcl=-0.2)
+```
+
+
+## Pooling Prey Items as a Single Resource
+Prey items in fish stomachs can sometimes be pooled prior to analysis. To determine whether two (or more) prey items act as a single resource, we can use chi-square contingency table analysis. In the example below, we are interested in whether prey *i* and prey *j* can be pooled prior to analysis.
+
+### Preparing Data
+These simple data can be entered directly into a matrix with `matrix()`.  This function takes a vector of measurements as the first argument, the number of rows in the matrix in the `nrow=` argument, and whether or not the values should be placed in the matrix by rows and then columns or vice versa in the `byrow=` argument (`byrow=TRUE` enters the data by rows first).  The columns and rows can then be labeled with `colnames()` and `rownames()`, respectively.
+```{r}
+d1 <- matrix(c(18,9,18,25),nrow=2,byrow=TRUE)
+colnames(d1) <- c("J.present","J.absent")
+rownames(d1) <- c("I.present","I.absent")
+d1
+addmargins(d1)                                 # for display only
+```
+
+### G-Test and Chi-Square Test
+The g-test used in the box is computed by submitting the data matrix to `g.test()`.
+```{r}
+( g1 <- g.test(d1) )
+```
+
+The G-test used above is an alternative to the more traditional chi-square test.  The chi-square test is constructed using `chisq.test()` with the data matrix as the first argument and, optionally, turning *off* the default continuity correction with `correct=FALSE`.
+```{r}
+( chi1 <- chisq.test(d1,correct=FALSE) )
+```
+
+### Association with Cross-Product Ratio
+The cross-product ratio to determine the direction of association is computed by extracting positions from the matrix as follows.
+```{r}
+(d1[1,1]*d1[2,2])/(d1[1,2]*d1[2,1])
+```
+
+
+## Presenting Diet Measures Graphically
+By combining different diet measures in two-dimensional space, graphical techniques can relay important information about feeding behavior of fishes.  Using Figure 11.3 (in text), we can interpret feeding strategies of each predator population in the graphs presented (in text).
+
+### Preparing Data
+The [Box11_2.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box11_2.txt) is read and the structure is observed.  Note that the `pred1` variable is a group factor variable that corresponds to the letters on the graphics in the box.
+```{r}
+d2 <- read.table("data/Box11_2.txt",header=TRUE)
+str(d2)
+```
+
+### Graphic -- Lattice Approach
+One of the easier ways to construct this graphic is to use `xyplot()` from the `lattice` package.  This function requires a formula of the form  `y`~`x|factor` as its first argument and the data frame containing those variables in the `data=` argument.  The `pch=19` argument is used to set the plotting character to solid circles.  The `layout=c(1,4)` argument is used to force the panels to appear in four rows by one column.  Finally, the `as.table=TRUE` argument forces the function to plot levels in order from the top of the graph rather than from the bottom.
+```{r fig.width=3.5, fig.height=5}
+xyplot(abundance~freqocc|pred1,data=d2,pch=19,layout=c(1,4),as.table=TRUE,
+       xlab="Frequency of Occurrence",ylab="Prey-Specific Abundance")
+```
+
+### Graphic -- ggplot2 Approach
+A similar graphic can be constructed using `qplot()` and `facet_grid()` from the `ggplot2` package.  The `qplot()` function requires the x and y variables as the first two arguments followed by a `data=` argument.  The `facet_grid()` function requires a formula that describes the subgroups to be plotted in separate panels.  As there is only one variable for the panels it must appear either on the left- or right-side of the tilde.  If it is on the left-side then the panels are vertical and there must then be a "dot" on the right-side of the tilde.
+```{r fig.width=3.5, fig.height=5}
+qplot(freqocc,abundance,data=d2,xlab="Frequency of Occurrence",
+      ylab="Prey-Specific Abundance") + facet_grid(pred1~.)
+```
+
+
+## Determining the Minimum and Maximum Sizes of Prey
+The maximum size of prey in fish diets often increases with body size.  However, the minimum size of prey may change relatively little.  In addition to determining the mean or median size of prey consumed by use of bivariate plots, investigators may want to characterize the maximum and minimum sizes consumed (i.e., the edges of the scattergrams).  Least absolute values regression (LAV), also called least absolute deviations regression, can be used to evaluate these types of diet data [@Scharfetal1998].  An extension of LAV, quantile regression, fits any specified quantile as a linear regression model.  The LAV is the 50th percentile (median) in quantile regression.  Such an analysis is available in the Blossom Statistical Software Package (@CadeRichards2000); available at [http://www.mesc.usgs.gov](https://www.fort.usgs.gov/products/software/blossom/)).  This program generates test statistics by permutations of the original data through re-randomization.  The R code producing similar results to the Blossom package is listed below.
+
+The quantile regression methodology used in this vignette is from the `quantreg` package.  A vignette that details the use of this methodology in more detail can be found by typing `vignette("rq",package="quantreg")`.
+
+### Preparing Data
+The [Box11_3.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box11_3.txt) is read and the structure is observed.
+```{r}
+d3 <- read.table("data/Box11_3.txt",header=TRUE)
+str(d3)
+```
+
+### Quick Exploration
+A scatterplot of prey fish length on Largemouth Bass length is constructed with `plot()` using a formula of the form `y`~`x`, the usual `data=` argument, and optional labels for the x- and y-axes.
+```{r}
+plot(PREY.len~LMB.len,data=d3,pch=19,xlab="Largemouth Bass Length (mm)",
+     ylab="Prey Fish Length (mm)")
+```
+
+### Quantile Regression -- Fitting a Specific Quantile
+```{r echo=FALSE, results='hide'}
+# for Sexpr below
+qr1 <- rq(PREY.len~LMB.len,data=d3,tau=0.5)
+```
+Quantile regressions are fit in R with `rq()` from the `quantreg` package.  This function takes many of the same arguments at `lm()` -- in particular, a formula of the form `response`~`explanatory` and the usual `data=` argument.  However, very importantly, it has an additional argument, called `tau=`, which contains decimal representations of the quantiles to be fit.  For example, to fit the median (i.e., 50th quantile) one would use `tau=0.5`.  The estimated coefficients, and parametric confidence intervals, are extracted from the saved `rq` object with `summary()`.  Typical inferential methods for the coefficient parameters can be seen by including the `covariance=TRUE` argument in `summary()`.  Botstrap estimates of the standard error and p-value can be estimated by including the `se="boot"` argument in `summary()`.  These results show that the median quantile regression has an intercept of `r formatC(coef(qr1)[1],format="f",digits=3)` and a slope of `r formatC(coef(qr1)[2],format="f",digits=3)` with the confidence interval bounds shown below.  Additionally, the intercept of the median regression is not different than zero and that there is a significantly positive slope.
+```{r}
+qr1 <- rq(PREY.len~LMB.len,data=d3,tau=0.5)
+summary(qr1,covariance=TRUE)
+summary(qr1,covariance=TRUE,se="boot")
+```
+
+### Quantile Regression -- Fitting Many Quantiles
+The `tau=` argument to `rq()` can take a vector of values such that a wide number of quantiles are fit simultaneously.  For example, the code below fits and summarizes the 5th, 25th, 50th, 75th, and 95th quantile regressions.  The `coef()` function can be used to extract just the model coefficients from the saved `rq` object.
+```{r}
+taus <- c(0.05,0.25,0.50,0.75,0.95)
+qr2 <- rq(PREY.len~LMB.len,data=d3,tau=taus)
+summary(qr2)
+coef(qr2)
+```
+
+A plot of the five quantile regression lines superimposed onto the observed data is obtained by simply plotting the raw data (as done above) and then using a `abline()` within a loop to superimpose the fitted quantile regression lines.  This plot suggests that the near minimum prey length increases only slightly with increasing predator length (slope=`r formatC(coef(qr2)["LMB.len",1],format="f",digits=3)`) whereas the near maximum prey length increases more dramatically (slope=`r formatC(coef(qr2)["LMB.len",5],format="f",digits=3)`).  The relationship in the middle of the distribution is a bit more difficult to interpret as the first quartile (quantile=0.25) and median regression show a fairly steep relationship whereas the third quartile (quantile=0.75) is fairly shallow.  This result could be a function of the distributions of prey lengths available to the predators.
+```{r}
+plot(PREY.len~LMB.len,data=d3,pch=19,xlab="Largemouth Bass Length (mm)",
+     ylab="Prey Fish Length (mm)")
+for (i in 1:length(taus)) abline(coef=coef(qr2)[,i],col=gray(taus[i]),lwd=2)
+```
+
+### Additional Plots
+The ability for the `tau=` argument to be a vector allows the fishery scientist to examine a wide variety of quantile regressions at once.  For example, the code below computes the quantile regressions for all quantiles between 0.05 and 0.95 in steps of 0.01.  The results of the fitting *AND* the summary function are saved to objects for later plotting using `plot()`.  The plots below illustrate the intercept (top) and slope (bottom) estimates for each quantile.   The results for the slope generally mirror what was observed above.  In general, the relationship between prey and predator lengths increases fairly dramatically from the near minimum to approximately the median regression, the becomes more shallow until about the 80th percentile, before becoming much steeper to the near maximum values.  Thus, it appears that approximately the length of the lower half and the upper fifth of prey consumed increases dramatically with increasing predator length but the the mid to upper lengths increase less strongly.
+```{r fig.width=3.5, fig.height=7}
+taus <- (5:95)/100
+qr3 <- rq(PREY.len~LMB.len,data=d3,tau=taus)
+sqr3 <- summary(qr3)
+plot(qr3)
+```
+
+The plots below are similar to the ones above except that 90% confidence bands have been added to the parameter estimates.  The confidence bands for the slope illustrate a relatively poor fit (wide intervals) at the extreme quantiles, very left-skewed intervals from approximately 0.5 to 0.65 and very right-skewed intervals from approximately 0.65 to 0.85.  These results indicate a lack of precision probably due to a relatively small sample size.
+```{r fig.width=3.5, fig.height=7}
+plot(sqr3)
+```
+
+
+## Analyzing Diet Data with Repeated-Measures Analysis of Variance (ANOVA)
+NOT YET COMPLETED
+
+
+## Assessing Spatial Patterns in Diet with the Two-Dimensional Kolmogorov-Smirnov Test
+Several statistical methods are available to relate diet patterns to the distribution of habitat in aquatic systems.  Mantel and partial-Mantel tests are powerful techniques that test whether spatial patterns are random or due to some treatment (or time).  These tests are not specifically discussed here.  More information can be obtained in @FortinGurevitch1993 and Chapter 18 of AIFFD.  If spatial data can be arranged into bivariate spatial coordinates, a two-dimensional Kolmogorov-Smirnov (2DKS) test can be used to (1) identify whether a single distribution has arisen by random effects or (2) compare two bivariate distributions (see @Garveyetal1998 for a review).  This nonparametric test finds the maximum difference, $D_{bks}$ (where $bks$ represents bivariate Kolmogorov-Smirnov), in integrated probabilities for four quadrants around each point in a plane.  If the maximum $D_{bks}$ between two distributions exceeds that expected randomly, we conclude that they differ.  The significance of the test statistic $D_{bks}$ is determined by rerandomizing the original data 5000 times and then comparing this randomly genereated distribution to the observed value.
+
+In the following hypothetical example, we want to know how vegetation in a large lake affects piscivory in age-0 smallmouth bass (*Micropterus dolomieu*).  We partition the bottom of a shallow lake into 80 habitat quadrants (20 x 4) and determine whether each contains vegetation.  Within each quadrant, we sample smallmouth bass diets by means of gastric lavage and note whether piscivory is present or absent.
+
+### Preparing Data
+The [Box11_5.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box11_5.txt) is read and the structure is observed.  The main data frame is first split into two data frames based on the two scenarios using `Subset()` and each of those data frames is split into two data frames based on the site charachteristc variable.  These splittings result in four data frames as defined by two scenarios (A and B) and two site characteristcs (``fish present" and "vegetations present").
+```{r}
+d5 <- read.table("data/Box11_5.txt",header=TRUE)
+str(d5)
+
+#Split the data frame into the two scenarios
+d5A <- Subset(d5,scenario=="A")
+d5B <- Subset(d5,scenario=="B")
+
+#Split each scenario into the fish present and vegetation present distributions,
+d5Af <- Subset(d5A,site.char=="fish.present")
+d5Av <- Subset(d5A,site.char=="vegetation.present")
+d5Bf <- Subset(d5B,site.char=="fish.present")
+d5Bv <- Subset(d5B,site.char=="vegetation.present")
+```
+
+### Plots
+Plots for both scenarios with different symbols for the fish and vegetation present information are constructed by using `plot()` to plot the data for the vegetation and then using `points()` to add the data for fish distributions.
+```{r}
+plot(coord2~coord1,data=d5Av,pch=2,cex=1.5,xlab="Coordinate 1",ylab="Coordinate 2"
+     ,xlim=c(1,20),ylim=c(1,4))
+points(coord2~coord1,data=d5Af,pch=19,cex=1)
+plot(coord2~coord1,data=d5Bv,pch=2,cex=1.5,xlab="Coordinate 1",ylab="Coordinate 2",
+     xlim=c(1,20),ylim=c(1,4))
+points(coord2~coord1,data=d5Bf,pch=19,cex=1)
+```
+
+### Scenario A ("Same"" Distributions)
+The `ks2d2()` function (from the `FSA` package) is used to perform the two-dimensional Kolmogorov-Smirnov test.  This function requires the two vectors of coordinates for one group of data as the first two arguments and the two vectors of coordinates for the second group of data as the next two (third and fourth) arguments.  A plot depicting the maximum is observed by submitting the saved `ks2d2` argument to `plot()`.
+```{r fig.width=7, fig.height=3.5}
+( scenA <- ks2d2(d5Av$coord1,d5Av$coord2,d5Af$coord1,d5Af$coord2) )
+plot(scenA)
+```
+
+The resampling p-value is computed with `ks2d2p()` which requires the saved `ks2d2` argument and the number of resamples to use in the `B=` argument.  A plot of the density of resamples is constructed by submitting the saved `ks2dp` object to `plot()`.
+```{r fig.width=7, fig.height=3.5, cache=TRUE}
+( scenAp <- ks2d2p(scenA,B=1000) )
+plot(scenAp)
+```
+
+### Scenario B ("Different" Distributions)
+Similar results for scenario B are shown below.
+```{r fig.width=7, fig.height=3.5}
+( scenB <- ks2d2(d5Bv$coord1,d5Bv$coord2,d5Bf$coord1,d5Bf$coord2) )
+plot(scenB)
+```
+```{r fig.width=7, fig.height=3.5, cache=TRUE}
+( scenBp <- ks2d2p(scenB,B=1000) )
+plot(scenBp)
+```
+
+
+## Determining Diet Patterns in Diet Data with Analysis of Covariance (ANCOVA)
+We often want to determine if diel patterns in diet data occur.  This has important implications for designing sampling protocols and interpreting diet data.  One way to determine whether diel variation in feeding occurs is by sampling fish during different times of the day.
+
+### Preparing Data
+The [Box11_6.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box11_6.txt) is read and the structure is observed.
+```{r}
+d6 <- read.table("data/Box11_6.txt",header=TRUE)
+str(d6)
+```
+
+The data provided on the book CD appears to faithfully reproduce the results shown in the figure in the box.  However, the stomach contents weight variable appears to have been divided by 100 to produce the ANOVA table shown in the box.  I will use the stomach content weight data as provided on the CD and *NOT* divided by 100.  The interpretations are exactly the same with both sets of data; however, the exact SS and MS values in the output are different by a constant amount.
+
+### Quick Exploration
+A scatterplot of stomach contents weight on predator length separated by time of day can be constructed with `plot()` and `points()` similar to what was shown above.
+```{r}
+# base empty figure
+plot(diet~length,data=d6,type="n",xlab="Predator Length (mm)", ylab="Stomach Contents Weight (mg)")
+# now add points
+points(diet~length,data=d6,subset=time=="evening",pch=19,col="black")
+points(diet~length,data=d6,subset=time=="morning",pch=1,col="blue")
+points(diet~length,data=d6,subset=time=="noon",pch=3,col="red")
+legend("topleft",legend=c("evening","morning","noon"),pch=c(19,1,3),col=c("black","blue","red"))
+```
+
+### ANCOVA Results I
+```{r echo=FALSE, results='hide'}
+# for Sexpr below
+lm1 <- lm(diet~length*time,data=d6)
+lm2 <- lm(diet~length+time,data=d6)
+```
+The ANCOVA is fit with `lm()` using a formula of the form `response`~`quantitative*factor`, where quantitative represents the quantitative covariate variable and factor represents the categorical group factor variable.  The right-hand-side of this formula is short-hand to tell R to fit the two main effects plus the interaction term.  The type-III ANOVA table is constructed by submitting the `lm` object to `Anova()` (from the `car` package) with the `type="III"` argument.  As described in the box, the high p-value for the interaction term (`r kPvalue(Anova(lm1,type="III")["length:time","Pr(>F)"])`) suggests that the slopes among the three times are statistically equal.
+```{r}
+lm1 <- lm(diet~length*time,data=d6)
+Anova(lm1,type="III")
+```
+
+The model with the interaction term dropped is fit and summarized below.  These results suggest that the intercept, and, thus, the predicted stomach content weights at all predator lengths, is different among the three times (`r kPvalue(Anova(lm2,type="III")["time","Pr(>F)"])`) and that the relationship between stomach contents weight and predator length is significantly positive (`r kPvalue(Anova(lm2,type="III")["length","Pr(>F)"])`).
+```{r}
+lm2 <- lm(diet~length+time,data=d6)
+Anova(lm2,type="III")
+```
+
+A visual of the model fit is obtained by submitting the saved `lm` object to `fitPlot()`, from the `FSA` package.
+```{r}
+fitPlot(lm2,xlab="Predator Length (mm)",ylab="Stomach Contents Weight (mg)",legend="topleft")
+```
+
+
+## Comparing Diet Data from Different Locations or Times with Multivariate Analysis of Variance (MANOVA)
+Because of the multivariate nature of diet data, we are often interested in determining whether diet composition differs among fishes sampled from different locations or at different times.  When diet data are measured as prey mass (or volume), MANOVA can be useful for testing an overall location (or time) effect.
+
+### Preparing Data
+The [Box11_7.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box11_7.txt) is read and the structure is observed.
+```{r}
+d7 <- read.table("data/Box11_7.txt",header=TRUE)
+str(d7)
+```
+
+### Fitting the Model
+A multivariate ANOVA (MANOVA) is performed in R with `manova()`, from the `MASS` package.  This function requires a model formula as the first argument where the left-hand-side of the formula is a *matrix* containing just the response variables and the right-hand-side contains the group factor variables.  In most cases the response variables will need to be extracted from a data frame, wrapped in `as.matrix()` to force them into a matrix object, and saved to a new object as shown below.  One might wonder why the four prey items are not included in this matrix.  As the data is the proportional composition of each prey item in each fish, the four items necessarily sum to 1.  This means that the value of each prey item can be perfectly derived by knowing the values of the other three prey items.  Models cannot be fit in R when one of the values is a perfect linear combination of the other values.  Thus, the prey items will be examined three at a time in this example.
+```{r}
+Y1 <- as.matrix(d7[,c("chiro","amph","odon")])
+```
+
+The response matrix and the `lake` explanatory variable are then used to form the formula in `manova()`.  The four test statistics shown in the first table on page 498 are extracted individually from the saved `manova()` object with `summary()` and various versions of the `test=` argument as illustated below.
+```{r}
+man1 <- manova(Y1~d7$lake)
+summary(man1,test="Wilks")
+summary(man1,test="Pillai")
+summary(man1,test="Hotelling-Lawley")
+summary(man1,test="Roy")
+```
+
+Three of the four results from the individual response variable ANOVAs shown in the last table on page 498 are extracted by including the saved `manova` object to `summary.aov()`.  The fourth individual ANOVA is not extracted above because the fourth prey item could not be included in the response vector as described previously.
+```{r}
+summary.aov(man1)
+```
+
+The fourth individual ANOVA can be obtained by creating a different response vector and repeating the process above.
+```{r}
+Y2 <- as.matrix(d7[,c("amph","odon","zoo")]) # put zoo in to get last indiv ANOVAs
+man2 <- manova(Y2~d7$lake)
+summary(man2,test="Wilks")                   # show that the results are the same
+summary.aov(man2)
+```
+
+### Sums-of-Squares and Cross-Products Matrices
+The SAS code in the box implies that the authors printed the sums-of-squares and cross-products matrices for the error and treatments (the *printe* and *printh* commands), though these results are not shown in the box.  The commands below would print these matrices in R.
+```{r}
+( n <- nrow(Y1) )
+( E1 <- (n-1)*cov(man1$residuals) )     # Error SSCP; diagonals are indiv SSerror
+( H1 <- (n-1)*cov(man1$fitted.values) ) # Treatment SSCP; diagonals are indiv SStreats
+```
+
+
+## Testing Prey Counts with Multiway Contingency Table Analysis
+When diet data are measured as prey counts, multiway contingency table analysis can be used to test for treatment effects.
+
+### Preparing Data
+The [Box11_8.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box11_8.txt) is read and the file is observed.
+```{r}
+d8 <- read.table("data/Box11_8.txt",header=TRUE)
+d8
+```
+
+NEEDS WORK HERE
+
+### Fitting the Model
+
+```{r echo=FALSE, eval=FALSE}
+glm1 <- glm(number~prey*stage*habitat,data=d8,family=poisson)
+summary(glm1)
+anova(glm1,test="Chisq")
+Anova(glm1,type="III")
+
+glm2 <- glm(number~prey+stage+habitat+prey:stage+prey:habitat+stage:habitat,data=d,family=poisson)
+Anova(glm2,type="III")
+
+glm3 <- glm(number~prey+stage+habitat+prey:habitat,data=d,family=poisson)
+Anova(glm3,type="III")
+```
+
+### Deleting Individual Prey Items
+```{r echo=FALSE, eval=FALSE}
+glm3a <- glm(number~prey+stage+habitat+prey:habitat,data=d,subset=prey!="amphipods",family=poisson)
+( aov3a <- Anova(glm3a,type="III") )
+
+glm3c <- glm(number~prey+stage+habitat+prey:habitat,data=d,subset=prey!="chironomids",family=poisson)
+( aov3c <- Anova(glm3c,type="III") )
+
+glm3m <- glm(number~prey+stage+habitat+prey:habitat,data=d,subset=prey!="mayfiles",family=poisson)
+( aov3m <- Anova(glm3m,type="III") )
+
+glm3o <- glm(number~prey+stage+habitat+prey:habitat,data=d,subset=prey!="ostracods",family=poisson)
+( aov3o <- Anova(glm3o,type="III") )
+
+data.frame(prey=levels(d$prey),pvalue.int=round(c(aov3a["prey:habitat","Pr(>Chisq)"],aov3c["prey:habitat","Pr(>Chisq)"],aov3m["prey:habitat","Pr(>Chisq)"],aov3o["prey:habitat","Pr(>Chisq)"]),4))
+```
+
+### Deleting Combined Prey Items
+
+```{r echo=FALSE, eval=FALSE}
+glm3ac <- glm(number~prey+stage+habitat+prey:habitat,data=d,subset=prey %nin% c("amphipods","chironomids"),family=poisson)
+aov3ac <- Anova(glm3ac,type="III")
+glm3am <- glm(number~prey+stage+habitat+prey:habitat,data=d,subset=prey %nin% c("amphipods","mayflies"),family=poisson)
+aov3am <- Anova(glm3am,type="III")
+glm3ao <- glm(number~prey+stage+habitat+prey:habitat,data=d,subset=prey %nin% c("amphipods","ostacods"),family=poisson)
+aov3ao <- Anova(glm3ao,type="III")
+glm3cm <- glm(number~prey+stage+habitat+prey:habitat,data=d,subset=prey %nin% c("chironomids","mayflies"),family=poisson)
+aov3cm <- Anova(glm3cm,type="III")
+glm3co <- glm(number~prey+stage+habitat+prey:habitat,data=d,subset=prey %nin% c("chironomids","ostracods"),family=poisson)
+aov3co <- Anova(glm3co,type="III")
+glm3mo <- glm(number~prey+stage+habitat+prey:habitat,data=d,subset=prey %nin% c("mayflies","ostracods"),family=poisson)
+aov3mo <- Anova(glm3mo,type="III")
+
+data.frame(prey=c("amph,chiro","amph,may","amph,ostra","chiro,may","chiro,ostra","may,ostra"),pvalue.int=round(c(aov3ac["prey:habitat","Pr(>Chisq)"],aov3am["prey:habitat","Pr(>Chisq)"],aov3ao["prey:habitat","Pr(>Chisq)"],aov3cm["prey:habitat","Pr(>Chisq)"],aov3co["prey:habitat","Pr(>Chisq)"],aov3mo["prey:habitat","Pr(>Chisq)"]),4))
+```
+
+
+## Exploring Diet Data with Principal Components Analysis
+Traditional multivariate techniques, such as PCA, can be constrained by the compositional nature of diet data in so much as the row sums must equal one.  Log-ratio analysis, such as %PCA (see text), is performed on the logarithm of proportions and can be useful for exploring individual variation in diet data.  For values equal to zero, very small numbers (e.g., 0.00001) are entered prior to analysis as recommended by @Aitchison1983.  A %PCA analysis was performed on the diet composition data given in Table 11.2.  The first two components accounted for 94% (%PC1=60%, %PC2=34%) of the total variation in diet data.
+
+### Preparing Data
+The [Box11_9.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box11_9.txt) is read and the structure is observed.  The proportion by weight of each prey species is computed and added to the data frame by dividing the weight of the prey by the total stomach contents weight.  The natural logarithms for each of the proportions is then computed but, first, to "adjust" for zeroes in the data, a small amount was added to each.
+```{r}
+d9 <- read.table("data/Box11_9.txt",header=TRUE)
+str(d9)
+# add proportions
+d9$pAmph <- d9$amph/d9$ttlwt
+d9$pLFish <- d9$lfish/d9$ttlwt
+d9$pDipt <- d9$dipt/d9$ttlwt
+d9$pMayfly <- d9$mayfly/d9$ttlwt
+# add logs of proportions
+amt <- 0.00001                    # small amount to adjust for zeroes
+d9$lpAmph <- log(d9$pAmph+amt)
+d9$lpLFish <- log(d9$pLFish+amt)
+d9$lpDipt <- log(d9$pDipt+amt)
+d9$lpMayfly <- log(d9$pMayfly+amt)
+# what does it all look like now
+str(d9)
+headtail(d9)
+```
+
+Finally, the logged proportion data was isolated to make entries to functions used below easier.
+```{r}
+d9a <- d9[,c("bluegill","lpAmph","lpLFish","lpDipt","lpMayfly")]
+str(d9a)
+```
+
+### Principal Components Analysis
+```{r echo=FALSE, results='hide'}
+# for Sexpr below
+pc1 <- princomp(d9a[,-1])
+res <- summary(pc1)$sd^2
+varexpl <- cumsum(res)/sum(res)
+```
+The principal components analysis (PCA) is computed with `princomp()` which requires the matrix or data frame of *just* the variables to be analyzed as the first argument.  A summary of the PCA is obtained by submitting the saved `princomp` object to `summary()`.  These results show that `r formatC(varexpl[2]*100,format="f",digits=1)`% of the overall variability is explained by the first two principal components.  The explained variances are also illustrated with a so-called scree plot constructed by submitting the saved `princomp` object to `screeplot()`.
+```{r}
+pc1 <- princomp(d9a[,-1])                    # ignore first column of bluegill IDs
+summary(pc1)
+screeplot(pc1,type="lines")
+```
+
+The loadings of each principal component are extracted from the `princomp` object with `loadings()`.  The top portion of this output shows that the first PC is largely inversely related to the proportion of larval fish in the diet and the second PC is mostly positively related to the proportion of Amphipods and somewhat negatively related to the proportion of mayflies.  These loadings, along with the relative position of the individual fish, are illustrated using `biplot()` with the `princomp` object as the first argument and a vector of labels for the individual fish in the `xlabs=` argument.
+```{r}
+loadings(pc1)
+biplot(pc1,xlabs=d9a$bluegill)
+```
+
+### Correlation Analysis
+The correlation between fish weight and the first two principal components is computed with `rcorr()`, from the `Hmisc` package.  Note that `rcorr()` requires a *matrix* as its first argument; thus, the fish weights and the first two principal components must be "column-bound" together to form a matrix.  These results show that there is a significant negative correlation between the first PC and Bluegill weight.  Thus, larger Bluegills consume greater amounts of larval fish (remember that more negative values of PC1 means more larval fish as the proportion of larval fish and the PC1 are negatively related).  This relationship is visualized with the scatterplot below.
+```{r}
+rcorr(cbind(d9$wt,pc1$scores[,1:2]))
+plot(pc1$scores[,1]~d9$wt,pch=19,xlab="Bluegill Weight",ylab="PC1")
+```
+
+### Ogle Comment
+The PCA results from R do not match the PCA results shown in the box.  Generally, PCA results often differ between softwares as the eigenvectors are not unique and can be rotated.  There is not enough information in the box to more fully compare these results.
+
+
+## Assessing Prey Preference
+Differences in prey selectively provide important insight about foraging patterns of fishes.  In many cases, these type of data are collected under controlled, experimental settings in which changes in the absolute abundance of prey can be accurately determined.
+
+@Catalanoetal2001 examined the effects of tag color on vulnerability to predation.  Age-0 Bluegills (*Lepomis macrochirus*) were marked with either brightly colored fluorescent tags or cryptic tags and then exposed to Largemouth Bass (*Micropterus salmoides*) predators in a series of tank experiments.  Manly's alpha was calculated using the equation for variable prey populations (equation 11.8 in text).
+
+### Ogle Comment
+Equation 11.8 in the text for computing the Manly-Chesson index appears to be incorrect.  The calculations on the companion CD are different, with the values in the sum in the denominator being logged, which also appears to be incorrect.  Most references (e.g., see [first page](http://www.jstor.org/discover/10.2307/1937838?uid=3739976&uid=2129&uid=2&uid=70&uid=4&uid=3739256&sid=47699089504467) of @Chesson1983) show that the denominator in equation 11.8 is correct but the numerator should *NOT* be logged as was done on the companion CD.  I will use the version where neither the numerator nor the denominator contain any logs.
+
+
+### Preparing Data
+The [Box11_10.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box11_10.txt) is read and the structure is observed.  The proportion remaining in each trial and tag color is computed and appended to the data frame.
+```{r}
+d10 <- read.table("data/Box11_10.txt",header=TRUE)
+str(d10)
+d10$P <- d10$prey.final/d10$prey.init
+d10
+```
+
+The computation of Manly's alpha first requires computing the sum of the proportions (`P`) within each trial.  This is most easily accomplished in R with `tapply()` using the variable to be summed as the first argument, the factor variable explaing the groups to be summed within as the second argument, and the `sum()` function as the last argument.  Manly's alpha is computed by dividing each proportion by sum in the corresponding trial.  As the two observations for each trial follow each other in the original data frame, the sums must be repeated before the division.  The sums are repeated by including the `sums` vector as the first argument to `rep()` and using the `each=2` argument so that each sum is repeated twice, one right after the other.
+```{r}
+( sums <- tapply(d10$P,d10$trial,sum) )
+( sums <- rep(sums,each=2))
+d10$alpha <- d10$P/sums
+d10
+```
+
+### Summaries and Tests
+Summary statistics of Manly's alpha by tag color are computed with `Summarize()` (from the `FSA` package) using a formula of the form `quantitative`~`factor` and the usual `data=` argument.  The two-sample t-test is computed by submitting the same formula and `data=` argument to `t.test()`.  The `var.equal=TRUE` argument was also used because the variances were statistically equal as determined from a Levene's test (computed with `leveneTest()` (from the `car` package) using the same formula and `data=` argument.)
+```{r}
+Summarize(alpha~tag.color,data=d10,digits=2)
+leveneTest(alpha~tag.color,data=d10)            # test for equal variances first
+t.test(alpha~tag.color,data=d10,var.equal=TRUE)
+```
+
+
+## Determining Trophic Position of Fishes with Stable Isotope Analysis
+Stable isotope data is often used to estimate the trophic position of fishes [@VanderZandenetal2000].  Variation in trophic position can then be used to evaluate factors affecting fish foraging patterns across space or time.
+
+In this example, isotope data were used to calculate the following trophic position estimates (TP) for different size Walleyes (*Sander vitreus*).  The relationship between TP and Walleye size was then used to develop an equation for predicted trophic position.
+
+### Ogle Comment
+In the box, it is not clear whether the authors generated the linear equation relating trophic position to Walleye length from the provided data or from some other source.  I was, however, unable to recreate their equation with the provided data.  Thus, in this vignette, I will perform the analysis generating the linear equation from the provided data and then show the results using the authors' provided equation.
+
+### Preparing Data
+The [Box11_11.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box11_11.txt) is read and the structure is observed.
+```{r}
+d11 <- read.table("data/Box11_11.txt",header=TRUE)
+str(d11)
+```
+
+### Exploratory Plot
+A plot of trophic position on Walleye length shows a very weak association.
+```{r}
+plot(tp~len,data=d11,pch=19,xlab="Walleye Length (mm)",ylab="Trophic Position")
+```
+
+### Regression of Trophic Position on Length
+The linear regression of trophic position on Walleye length is computed with `lm()` using a formula of the form `response`~`explanatory` and the usual `data=` argument.  The coefficients are extracted from the `lm` object using `summary()`.  From this, one can see that the linear equation is TP=`r formatC(coef(lm1)[1],format="f",digits=3)`+`r formatC(coef(lm1)[2],format="f",digits=6)`*LEN.  A plot of the model fit is constructed with `fitPlot()` as shown below.
+```{r}
+lm1 <- lm(tp~len,data=d11)
+summary(lm1)
+fitPlot(lm1,xlab="Walleye Length (mm)",ylab="Trophic Position",main="")
+```
+
+The residuals from the model fit are extracted by appending `$residuals` to the `lm` object.  In the code below, the residuals are saved to an object in the first line and the second line computes the mean of the absolute value of the residuals.
+```{r}
+resids <- lm1$residuals
+mean(abs(resids))
+```
+
+### Using Provided Equation
+The authors' provided the following equation for the relationship between trophic position and Walleye length: TP=2.797+0.001445*LEN.  This equation can be added to the previous plot with `abline()` to see how it differs.
+```{r}
+fitPlot(lm1,xlab="Walleye Length (mm)",ylab="Trophic Position",main="")
+abline(coef=c(2.797,0.001445),lwd=2,lty=3,col="red")
+```
+
+The summarization of the residuals is performed by first subtracting the predicted length from the authors provided equation from the observed trophic positions.
+```{r}
+resids2 <- d11$tp-(2.797+0.001445*d11$len)
+mean(abs(resids2))
+```
+
+--------------------------------------------------------------
+
+```{r echo=FALSE}
+et <- proc.time() - stime
+reproInfo(rqrdPkgs=rqrd,elapsed=et["user.self"]+et["sys.self"])
+```
+
+```{r echo=FALSE, results='hide', message=FALSE}
+purl2("Chapter11.Rmd",moreItems=c("source","rqrd","stime"))    # Will create the script file
+```
+
+--------------------------------------------------------------
+## References

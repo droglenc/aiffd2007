@@ -117,4 +117,4 @@ m2a <- lme(logit~0+per, data=d0, random=~1|site, weights=~tot, correlation=corAR
 m3a <- lme(logit~0+per, data=d0, random=~1|yr, weights=~tot, correlation=corAR1(form=~yr|site))
 
 
-# Script created at 2015-05-14 14:41:58
+# Script created at 2015-05-14 17:45:03
