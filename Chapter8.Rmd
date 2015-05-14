@@ -31,7 +31,7 @@ source('knitr_setup.R')
 
 This document contains R versions of the boxed examples from **Chapter 8** of the "Analysis and Interpretation of Freshwater Fisheries Data" book.  Some sections build on descriptions from previous sections, so each section may not stand completely on its own.  More thorough discussions of the following items are available in linked vignettes:
 
-* the use of linear models in R in the [linear models vignette](LinearModels.PDF),
+* the use of linear models in R in the [preliminaries vignette](LinearModels.PDF),
 * differences between and the use of type-I, II, and III sums-of-squares in the [preliminaries vignette](preliminaries.PDF), and
 * the use of "least-squares means" is found in the [preliminaries vignette](preliminaries.PDF).
 
@@ -51,19 +51,18 @@ setwd("C:/aaaWork/Web/fishR/BookVignettes/aiffd2007")
 
 In addition, I prefer to not show significance stars for hypothesis test output, reduce the margins on plots, alter the axis label positions, and reduce the axis tick length.  In addition, contrasts are set in such a manner as to force R output to match SAS output for linear model summaries.  All of these options are set with
 ```{r eval=FALSE}
-options(width=90,continue=" ",show.signif.stars=FALSE, contrasts=c("contr.sum","contr.poly"))
+options(width=90,continue=" ",show.signif.stars=FALSE,
+        contrasts=c("contr.sum","contr.poly"))
 par(mar=c(3.5,3.5,1,1),mgp=c(2.1,0.4,0),tcl=-0.2)
 ```
 
 
-
-##  8.1 Estimation of Abundance and Density Based on Distance Sampling
-An investigator snorkels along a 100-m transect that is randomly located in a stream reach containing 500 m$^{2}$.  Thirty brook trout (*Salvelinus fontinalis*) are observed at the right-angle distances (m) from the center of the transect.  The data is entered below and shown in the text Box.  The investigator would like to estimate the density of brook trout in the section and the total population in the reach.
+## Estimation of Abundance and Density Based on Distance Sampling
+An investigator snorkels along a 100-m transect that is randomly located in a stream reach containing 500 m$^{2}$.  Thirty Brook Trout (*Salvelinus fontinalis*) are observed at the right-angle distances (m) from the center of the transect.  The data is entered below and shown in the text Box.  The investigator would like to estimate the density of Brook Trout in the section and the total population in the reach.
 
 The following variables are defined:
 
-
-Variable  Definition
+Variable | Definition
 -------- | ----------
 $n$ | number of animals observed
 $N$ | total population in reach
@@ -130,12 +129,11 @@ round(d1$CI,0)
 ```
 
 
-
-##  8.2 Applications of Likelihood Functions in Population Estimation
+## Applications of Likelihood Functions in Population Estimation
 Here, we illustrate the ideas underlying likelihood functions in the context of estimating population size.  For this example, consider the situation in which 60 fish are present in a pool within a stream and we have a 40% chance of catching each fish with one electrofishing pass.  In this example, we theoretically could catch between 0 and 60 fish.  Assuming that the probability a fish is caught is independent among fish, the probability that a specific number of fish will be caught in one pass is given by a binomial probability distribution.
 
 ### Binomial Distribution Calculation Example
-In the first paragraph of the Box, the authors illustrate using the binomial distribution to compute the probability of observing a catch of 20 fish if the population contains a total of 60 fish and the probability of capture (i.e., the catchability) is 0.4.  In R, `dbinom()` returns this probability when given the observed sample size of "successes" (i.e., fish was caught) as the first argument, the total population size in the `size=` argument and the probability of "success" in the `prob=` argument.  For example, the illustrative example in the box is computed below.
+In the first paragraph of the box, the authors illustrate using the binomial distribution to compute the probability of observing a catch of 20 fish if the population contains a total of 60 fish and the probability of capture (i.e., the catchability) is 0.4.  In R, `dbinom()` returns this probability when given the observed sample size of "successes" (i.e., fish was caught) as the first argument, the total population size in the `size=` argument and the probability of "success" in the `prob=` argument.  For example, the illustrative example in the box is computed below.
 ```{r}
 N <- 60
 p <- 0.4
@@ -153,7 +151,7 @@ axis(1,max.catch,max.catch,col="red")
 ```
 
 ### Binomial Distribution Likelihood Calculation Example
-The simple calculation shown in the third paragraph of the Box is given as an example of a likelihood calculation is the same as the simple calculation shown above.  The calculation (and graphic) of the likelihood of observing n=20 fish given a catchability of 0.4 and a variety of reasonable values of N can be made with the code below.
+The simple calculation shown in the third paragraph of the box is given as an example of a likelihood calculation is the same as the simple calculation shown above.  The calculation (and graphic) of the likelihood of observing n=20 fish given a catchability of 0.4 and a variety of reasonable values of N can be made with the code below.
 ```{r ,fig=TRUE,width=4,height=3}
 possN <- seq(0,100)                        # create possible values of N between 0 and 100
 lh <- dbinom(20,size=possN,prob=p)         # find probabilities for possible Ns
@@ -162,17 +160,16 @@ plot(lh~possN,type="l",xlab="Population Size",ylab="Likelihood")
 abline(v=max.lh,lty=2,col="red")           # mark the maximum possN
 ```
 
-The remainder of the discussion and computations in Box 8.2 are basically repeated in BOX 8.5.
+The remainder of the discussion and computations in the box are basically repeated in [Box 8.5](#estimation-of-abundance-based-on-the-removal-method-in-a-closed-population).
 
 
-
-##  8.3 Estimation of Population Abundance for a Closed Population Based on the Mark-Recapture Models of @Otisetal1978
-An investigator conducts a mark-recapture study on a closed population of largemouth bass (*Micropterus salmoides*) in a farm pond in order to determine the abundance of adult fish.  The sampling consists of four sampling events; fish captured in each event are given a uniquely numbered Floy tag and released.  The capture-recapture data are arranged into a capture matrix in which each cell of the matrix ($X_{ij}$) is referenced by fish $i$ in row $i$ and sample period $j$ in column $j$.  An entry of $1$ in the matrix indicates that a fish was caught, and a $0$ indicates that the fish was not caught during that sampling period.  Fish 1, for example (see Box in text), was caught in all four sampling periods, whereas fish 4 was caught in only the first sample period.
+## Estimation of Population Abundance for a Closed Population Based on the Mark-Recapture Models of @Otisetal1978
+An investigator conducts a mark-recapture study on a closed population of Largemouth Bass (*Micropterus salmoides*) in a farm pond in order to determine the abundance of adult fish.  The sampling consists of four sampling events; fish captured in each event are given a uniquely numbered Floy tag and released.  The capture-recapture data are arranged into a capture matrix in which each cell of the matrix ($X_{ij}$) is referenced by fish $i$ in row $i$ and sample period $j$ in column $j$.  An entry of $1$ in the matrix indicates that a fish was caught, and a $0$ indicates that the fish was not caught during that sampling period.  Fish 1, for example (see box in text), was caught in all four sampling periods, whereas fish 4 was caught in only the first sample period.
 
 ### Preparing Data
-The [`box8_3.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_3.txt) is read and the structure is observed.
+The [Box8_3.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_3.txt) is read and the structure is observed.
 ```{r}
-d3 <- read.table("data/box8_3.txt",header=TRUE)
+d3 <- read.table("data/Box8_3.txt",header=TRUE)
 str(d3)
 ```
 
@@ -183,7 +180,7 @@ The fish identification numbers in the first column are not needed for any furth
 
 ### Summarized Capture Histories
 The `descriptive()` function from the `Rcapture package`.  A description of the use of `Rcapture` can be obtained by typing `vignette("RcaptureJSS","Rcapture")`. can be used to compute some basic summary values from the capture histories.  This function requires the matrix or data frame containing *just* the capture histories as the first argument.  Two graphics useful for identifying different types of capture probability heterogeneities (see Table 1 on page 4 of the `Rcapture` vignette) by submitting the saved `descriptive` object to `plot()`.
-```{r fig.width=7, fig.height=7, out.width='.8\\linewidth'}
+```{r fig.width=5, fig.height=7}
 ( desc <- descriptive(d3ch) )
 plot(desc)
 ```
@@ -204,58 +201,54 @@ The suite of models (with a few additions) of @Otisetal1978 can be efficiently f
 res1$results
 ```
 
-The AIC values are somewhat different from what is presented in the Box.  However, if one rescales the AIC values for the three models presented in the Box so that the AIC for the `M0` model is the same as that presented in the Box then one can see that the differences between what is presented here and in the box is largely a constant value (with some rounding error).
+The AIC values are somewhat different from what is presented in the box.  However, if one rescales the AIC values for the three models presented in the box so that the AIC for the `M0` model is the same as that presented in the box then one can see that the differences between what is presented here and in the box is largely a constant value (with some rounding error).
 ```{r}
 ( res1a <- res1$results[c("M0","Mt","Mb"),"AIC"] )
 res1a-min(res1a)+26.598
 ```
 
 The 95% confidence interval for the abundance based on the profile likelihood (with a corresponding graphic) is found by submitting the capture history matrix or data frame as the first argument and the abbreviation of the "best" model in the `m=` argument to `profileCI()` from the `Rcapture` package.
-```{r eval=FALSE}
-#### Gives error .. Need to investigate this
+```{r}
 ( CI1 <- profileCI(d3ch,m="M0") )
 ```
 
 
-
-##  8.4 Estimation of Abundance Based on a Cormack-Jolly-Seber Method for Open Populations
-In order to determine the conservation status of desert pupfish, *Cyprinodon macularius*, a graduate student performs a 3-year capture-recapture experiment on the population in a desert pool that is closed to immigration and emigration but where recruitment and mortality occur on an annual basis.
+## Estimation of Abundance Based on a Cormack-Jolly-Seber Method for Open Populations
+In order to determine the conservation status of Desert Pupfish, *Cyprinodon macularius*, a graduate student performs a 3-year capture-recapture experiment on the population in a desert pool that is closed to immigration and emigration but where recruitment and mortality occur on an annual basis.
 
 ### Preparing Data
-The [`box8_4.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_4.txt) is read and the structure is observed.  Note that the fish identification numbers in the first column are not needed for any further analysis and that the rest of the columns contain the capture histories.
+The [Box8_4.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_4.txt) is read and the structure is observed.  Note that the fish identification numbers in the first column are not needed for any further analysis and that the rest of the columns contain the capture histories.
 ```{r}
-d4 <- read.table("data/box8_4.txt",header=TRUE)
+d4 <- read.table("data/Box8_4.txt",header=TRUE)
 str(d4)
 ```
 
 ### Analysis Using the FSA Package
-The analyses in this vignette do not exactly follow those shown in Box 8.4 because special purpose packages are available in R for these analyses (unlike SAS).  One of these packages is `FSA`.  A more thorough description of the technique used in `FSA` can be found in the [Mark-Recapture Open Vignette](../../gnrlex/MROpen/MROpen.pdf).  It should be noted that the results here will not exactly match those in the Box because the code in the `FSA` uses formulas that have been modified to guard against bias in the parameter estimates, which were not used in the Box.
+The analyses in this vignette do not exactly follow those shown in box because special purpose packages are available in R for these analyses (unlike SAS).  One of these packages is `FSA`.  A more thorough description of the technique used in `FSA` can be found in the [Chapter 7 of the Introductory Fisheries Analysis with R book](https://fishr.wordpress.com/books/ifar/).  It should be noted that the results here will not exactly match those in the Box because the code in the `FSA` uses formulas that have been modified to guard against bias in the parameter estimates, which were not used in the Box.
 
-The `capHistSum()` function is used to provide basic summary values from the capture histories.  This function requires the matrix or data frame containing the capture histories as the first argument.  If the data frame has columns that do not contain capture history information, as the first column in this example, then the specific columns containing the capture history must be identified in the `cols=` argument.  In this example, we simply want to exclude the first column, so `cols=-1` can be used.  Of particular interest in the computation of the Jolly-Seber method is the summaries in the so-called "Method B table."  These summaries are found in `mb.top` and `mb.bot` of the object saved from `capHistSum()`.
+The `capHistSum()` function is used to provide basic summary values from the capture histories.  This function requires the matrix or data frame containing the capture histories as the first argument.  If the data frame has columns that do not contain capture history information, as the first column in this example, then the specific columns containing the capture history must be identified in the `cols2use=` argument.  In this example, we simply want to exclude the first column, so `cols2use=-1` can be used.  Of particular interest in the computation of the Jolly-Seber method is the summaries in the so-called "Method B table."  These summaries are found in `mb.top` and `mb.bot` of the object saved from `capHistSum()`.
 ```{r}
-chsum <- capHistSum(d4,cols=-1)
+chsum <- capHistSum(d4,cols2use=-1)
 chsum$methodB.top
 chsum$methodB.bot
 ```
 
-The `mrOpen()` function, from the `FSA` package, performs the calculations of the Jolly-Seber method.  This function requires the saved `capHistSum` object as its only argument.  Specific summary results can be extracted from the saved `mrOpen` object with `summary()` and the confidence intervals for the parameter estimates are extracted with `confint().
+The `mrOpen()` function, from the `FSA` package, performs the calculations of the Jolly-Seber method.  This function requires the saved `capHistSum` object as its only argument.  The abundance estimates and confidence intervals are extracted from the saved `mrOpen` object with `summary()` and `confint()`, respectively, both with `parm="N"`.
 ```{r}
 res1 <- mrOpen(chsum)
-summary(res1)
-confint(res1)
+summary(res1,parm="N")
+confint(res1,parm="N")
 ```
 
 ### Ogle Comment
 Future versions of this vignette will demonstrate how to perform this analysis using functions from the `Rcapture` and `RMark` packages.  Please contact me (dogle@northland.edu) if you would like to add these sections to this vignette.
 
 
-
-##  8.5 Estimation of Abundance Based on the Removal Method in a Closed Population
-In order to estimate the abundance of brown trout *Salmo trutta* in a 50-m section of stream below a culvert, a fishery manager conducts a three-pass removal experiment.  Fish cannot move upstream because of the culvert, and the manager places a block net on the lower section of the study reach to insure that the population is geographically closed.  All three sampling passes are conducted during the same day by means of a backpack electrofishing unit.  During sampling, 24 brown trout are caught in the first sampling pass, 17 in the second sampling pass, and 8 in the third sampling pass.
+## Estimation of Abundance Based on the Removal Method in a Closed Population
+In order to estimate the abundance of Brown Trout *Salmo trutta* in a 50-m section of stream below a culvert, a fishery manager conducts a three-pass removal experiment.  Fish cannot move upstream because of the culvert, and the manager places a block net on the lower section of the study reach to insure that the population is geographically closed.  All three sampling passes are conducted during the same day by means of a backpack electrofishing unit.  During sampling, 24 Brown Trout are caught in the first sampling pass, 17 in the second sampling pass, and 8 in the third sampling pass.
 
 ### "Hand" Calculation of One Likelihood
-For simplicity, I am going to make the following definitions (which stray somewhat from those used in the Box,
-
+For simplicity, I am going to make the following definitions (which stray somewhat from those used in the box),
 
 * $p$: Probability of capture (this is basically $q$ in Box 8.5).
 * $q$ $1-p$: this is *NOT* catchability and is used simply to keep the coding tidy.
@@ -264,8 +257,7 @@ For simplicity, I am going to make the following definitions (which stray somewh
 * $catch$: a vector containing the number of fish from each removal pass.
 * $n$: total number of fish removed in all passes
 
-
-Given these definitions, the following code is simply a series of calculations for the example shown in the Box.
+Given these definitions, the following code is simply a series of calculations for the example shown in the box.
 ```{r}
 p <- 0.2
 q <- 1-p
@@ -276,7 +268,7 @@ denom <- p+p*q+p*q*q
 ```
 
 ### Creating a Function for Computing The Likelihood of the Probability of Capture
-You will generally need to compute the likelihood for a wide variety of values for which you are trying to maximize the likelihood.  This is most easily performed by first creating a function that will efficiently compute the likelihood given one value.  Functions are created in R with `function()` as described in BOX 8.2.  The following code produces a function, called `crmvlLH()` that takes a value of $p$ as the first argument and the vector of catches as the second argument and returns the log likelihood value.
+You will generally need to compute the likelihood for a wide variety of values for which you are trying to maximize the likelihood.  This is most easily performed by first creating a function that will efficiently compute the likelihood given one value.  Functions are created in R with `function()` as described in [Box 8.2](#applications-of-likelihood-functions-in-population-estimation).  The following code produces a function, called `crmvlLH()` that takes a value of $p$ as the first argument and the vector of catches as the second argument and returns the log likelihood value.
 ```{r}
 crmvlLH <- function(p,catch) {
   t <- length(catch)
@@ -314,7 +306,7 @@ lines(rep(phat,2),c(min(plhs),maxplh),lty=2,col="red")
 ```
 
 ### Confidence Interval for the Probability of Capture
-The authors of Box 8.5 note that a 95% confidence interval can be determined from the log-likelihood profile by finding the values of $p$ that correspond to the endpoints of the log-likelihood values that are 3.841 less than the maximum log-likelihood value.  This process is generalized with the function defined below.
+The authors of the box note that a 95% confidence interval can be determined from the log-likelihood profile by finding the values of $p$ that correspond to the endpoints of the log-likelihood values that are 3.841 less than the maximum log-likelihood value.  This process is generalized with the function defined below.
 ```{r}
 logLikCI <- function(logLiks,vals,conf.level=0.95) {
   rel.lhs <- max(logLiks)-logLiks
@@ -329,14 +321,15 @@ For example, the 95% CI for $p$ in this example is computed below.
 ```  
 
 ### Maximizing the Log-Likelihood of $N$
-The authors of Box 8.5 show how $N$ is computed from the total catch in all removals (i.e., $p$) and what is essentially the *denominator* calculation in the likelihood parts given a value of $p$.  Thus, this formula is used to compute $N$ for each value of $p$ in the sequence created above.  The likelihood for each of the $p$s is then the likelihood for each of the corresponding $N$s and the optimal value for $N$ simply comes from the optimal value of $p$.  The optimal value of $N$, likelihood profile (and plot), and likelihood profile confidence intervals are computed below.
+The authors of the box show how $N$ is computed from the total catch in all removals (i.e., $p$) and what is essentially the *denominator* calculation in the likelihood parts given a value of $p$.  Thus, this formula is used to compute $N$ for each value of $p$ in the sequence created above.  The likelihood for each of the $p$s is then the likelihood for each of the corresponding $N$s and the optimal value for $N$ simply comes from the optimal value of $p$.  The optimal value of $N$, likelihood profile (and plot), and likelihood profile confidence intervals are computed below.
 ```{r}
 ( Nhat <- n/(phat+phat*(1-phat)+phat*((1-phat)^2)) )
 Ns <- n/(ps+ps*(1-ps)+ps*((1-ps)^2))
 ( Nhat.CI <- logLikCI(plhs,Ns) )
 plot(plhs~Ns,type="l",xlab="Population Size",ylab="Log-Likelihood")
 lines(rep(Nhat,2),c(min(plhs),maxplh),lty=2,col="red")
-plot(plhs~Ns,type="l",xlab="Population Size",ylab="Log-Likelihood",ylim=c(-55,-49),xlim=c(50,400))
+plot(plhs~Ns,type="l",xlab="Population Size",ylab="Log-Likelihood",
+     ylim=c(-55,-49),xlim=c(50,400))
 lines(rep(Nhat,2),c(min(plhs),maxplh),lty=2,col="red")
 ```
 
@@ -348,7 +341,7 @@ optim1$maximum      # p corresponding to maximum likelihood value
 optim1$objective    # maximum likelihood value
 ```
 
-As an illustration, we could also use `optim()` but because $p$ must be between 0 and 1 we would use the `"L-FBGS-B"` optimization algorithm (again, see the [Optimization Vignette](../preliminaries/optimization.html) for more information).  The optimal value of $p$ is obtained with `optim()` below.
+As an illustration, we could also use `optim()` but because $p$ must be between 0 and 1 we would use the `"L-FBGS-B"` optimization algorithm (again, see the Optimization portion of the [Preliminaries Vignette](https://fishr.wordpress.com/books/aiffd/) for more information).  The optimal value of $p$ is obtained with `optim()` below.
 ```{r}
 optim2 <- optim(0.2,crmvlLH,catch=catch,method="L-BFGS-B",lower=0.01,upper=0.99,
                 control=list(fnscale=-1))
@@ -357,30 +350,29 @@ optim2$value        # maximum likelihood value
 ```
 
 ### Simplifying Function for 3-Pass Removal
-The `removal()` function is from the `FSA` package.  The current version of `removal()` in the `FSA` package can only be used for 2- and 3-pass removal experiments.  Experiments with more removals must use the more general technique described previously. is equipped to provide estimates of $q$ and $N$ for various methods applied to 3-pass and 2-pass removal data.  This function requires a vector of catch data as the first argument and a `type=` argument that indicates which method will be used.  The method described in the book (equations 8.22 and 8.23) for a three pass removal experiment is computed with `type="Seber3"` in `removal()`.  The parameter estimates an resultant confidence intervals are extracted from the saved `removal` object with `summary()` and `confint()`, respectively.
+The `removal()` function is from the `FSA` package.  The current version of `removal()` in the `FSA` package can only be used for 2- and 3-pass removal experiments.  Experiments with more removals must use the more general technique described previously. is equipped to provide estimates of $q$ and $N$ for various methods applied to 3-pass and 2-pass removal data.  This function requires a vector of catch data as the first argument and a `method=` argument that indicates which method will be used.  The method described in the book (equations 8.22 and 8.23) for a three pass removal experiment is computed with `method="Seber3"` in `removal()`.  The parameter estimates an resultant confidence intervals are extracted from the saved `removal` object with `summary()` and `confint()`, respectively.
 ```{r}
-rem <- removal(catch,type="Seber3")
+rem <- removal(catch,method="Seber3")
 summary(rem)
 confint(rem)           # normal approximation CI
 ```
 
 
-
-##  8.6 Estimation of Abundance Based on the Removal Method in an Open Population
-A population of lake trout *Salvelinus namaycush* subjected to a commercial fishery was studied from 1985 to 2001 with the goal of determining trends in abundance over time.  The population is sampled each year by a fishery-independent otter trawl survey.  Data collected in the survey provide measures of relative abundance ($\frac{C}{f}$) for fish large enough to be vulnerable to capture in the commercial fishery (adults) and prerecruits that are not vulnerable to the commercial fishery.  The number of fish harvested in the commercial fishery is recorded each year and is assumed to be occur at the beginning of the year.
+## Estimation of Abundance Based on the Removal Method in an Open Population
+A population of Lake Trout (*Salvelinus namaycush*) subjected to a commercial fishery was studied from 1985 to 2001 with the goal of determining trends in abundance over time.  The population is sampled each year by a fishery-independent otter trawl survey.  Data collected in the survey provide measures of relative abundance ($\frac{C}{f}$) for fish large enough to be vulnerable to capture in the commercial fishery (adults) and prerecruits that are not vulnerable to the commercial fishery.  The number of fish harvested in the commercial fishery is recorded each year and is assumed to be occur at the beginning of the year.
 
 ### Ogle Comment
-The authors of Box 8.6 use Excel's solver routine to find the optimal solution to a "hand-made" sum-of-squared-deviations formula.  R provides a suite of optimization algorithms, but the algorithm used by Excel's solver routine is not one of those in the R suite.  The analysis demonstrated on this page will, thus, not exactly match that shown in the printed Box.  However, there is no reason to believe that the solution provided by Excel's solver is "better" in any regard than that provided by R's optimization algorithms (or vice versa).  You should read the [Optimization Vignette](../preliminaries/optimization.html) for an introduction on using R's optimization functions.
+The authors of the box use Excel's solver routine to find the optimal solution to a "hand-made" sum-of-squared-deviations formula.  R provides a suite of optimization algorithms, but the algorithm used by Excel's solver routine is not one of those in the R suite.  The analysis demonstrated on this page will, thus, not exactly match that shown in the printed Box.  However, there is no reason to believe that the solution provided by Excel's solver is "better" in any regard than that provided by R's optimization algorithms (or vice versa).  You should read the Optimization portion of the [Preliminaries Vignette](https://fishr.wordpress.com/books/aiffd/) for an introduction on using R's optimization functions.
 
 ### Preparing Data
-The [`box8_6.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_6.txt) is read and the structure is observed.
+The [Box8_6.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_6.txt) is read and the structure is observed.
 ```{r}
-d6 <- read.table("data/box8_6.txt",header=TRUE)
+d6 <- read.table("data/Box8_6.txt",header=TRUE)
 str(d6)
 ```
  
 ### Optimization I
-The authors of Box 8.6 set a constant fish mortality of 0.2.  This should be saved to an object to allow ease of changing at a later time (e.g., if one were examining the sensitivity of the results to this assumption).  The authors chose a starting value of 0.0001 for the catchability parameter and 1 for each of the "variability" parameters.  In the code below I set each of these parameters separately and then combined them into one vector as R's optimization routines expects all parameters to be in one vector.  Note that `rep()` is used to create a vector with the first argument repeated the number of times shown in the second vector.  Thus, starting values for the `r 2*length(d6$catch)+1` parameters of this model are set as shown below.
+The authors of the box set a constant fish mortality of 0.2.  This should be saved to an object to allow ease of changing at a later time (e.g., if one were examining the sensitivity of the results to this assumption).  The authors chose a starting value of 0.0001 for the catchability parameter and 1 for each of the "variability" parameters.  In the code below I set each of these parameters separately and then combined them into one vector as R's optimization routines expects all parameters to be in one vector.  Note that `rep()` is used to create a vector with the first argument repeated the number of times shown in the second vector.  Thus, starting values for the `r 2*length(d6$catch)+1` parameters of this model are set as shown below.
 ```{r}
 M <- 0.2                              # constant M
 q <- 0.0001                           # initial value for q
@@ -388,7 +380,7 @@ etas <- rep(1,length(d6$catch))       # use 1s as initial values for etas
 deltas <- rep(1,length(d6$catch))     # use 1s as initial values for deltas
 par <- c(q,etas,deltas)               # put all parameters into one vector
 ```
-The authors use a "sum-of-squared-errors" formula shown in the printed box on page 355.  This formula requires some "prior" calculations shown by equations 8.34, 8.35, and 8.36 in the main text.  These formulas are put into a function, called `ABsse()`, in the code below.  This function requires the vector of parameter values as the first argument, the catch data as the second argument, the vector of adult cpe as the third argument, the vector of pre-recruit cpe as the four argument, and the assumed value of fishing mortality as the fifth argument.  The function will return the SSE calculation shown in Box 8.6 on page 355.
+The authors use a "sum-of-squared-errors" formula shown in the printed box on page 355.  This formula requires some "prior" calculations shown by equations 8.34, 8.35, and 8.36 in the main text.  These formulas are put into a function, called `ABsse()`, in the code below.  This function requires the vector of parameter values as the first argument, the catch data as the second argument, the vector of adult cpe as the third argument, the vector of pre-recruit cpe as the four argument, and the assumed value of fishing mortality as the fifth argument.  The function will return the SSE calculation shown in the box on page 355.
 ```{r}
 ABsse <- function(par,catch,A,R,M,sse.only=TRUE)  {
   n <- length(catch)                  # get number of years of data
@@ -403,7 +395,8 @@ ABsse <- function(par,catch,A,R,M,sse.only=TRUE)  {
   sse.3 <- sum((A-ntilde)^2,na.rm=TRUE) # Sum of squared deviations Adult CPE
   sse <- sse.1+sse.2+sse.3            # compute overall SSE
   if (sse.only) sse
-    else list(sse=sse,parts=c(sse.1,sse.2,sse.3), q,vals=data.frame(nhat=nhat,ntilde=ntilde,rhat=rhat,eta,delta))
+    else list(sse=sse,parts=c(sse.1,sse.2,sse.3),q,
+              vals=data.frame(nhat=nhat,ntilde=ntilde,rhat=rhat,eta,delta))
 }
 ```
 
@@ -419,7 +412,8 @@ ABoptim1$convergence                  # a "1" means that maximum iterations limi
 
 However, the "convergence" message above indicates that the number of iterations was exceeded (which is fairly common with the default Nelder-Mead algorithm).  The maximum number of iterations can be increased with the `maxit=` argument in the `control=` argument list.
 ```{r}  
-ABoptim2 <- optim(par,ABsse,catch=d6$catch,A=d6$aIndex,R=d6$rIndex,M=M,control=list(maxit=25000))
+ABoptim2 <- optim(par,ABsse,catch=d6$catch,A=d6$aIndex,R=d6$rIndex,M=M,
+                  control=list(maxit=25000))
 ABoptim2$value                        # "minimum" SSE
 ABoptim2$counts[1]                    # number of iterations
 ABoptim2$convergence                  # a "0" means completed successfully
@@ -427,7 +421,7 @@ ABoptim2$convergence                  # a "0" means completed successfully
 
 Notice that several thousand more iterations were needed to arrive at an optimal solution but that solution had a dramatically lower SSE.
 
-Let's see if rescaling the parameters (see [Optimization Vignette](../preliminaries/Optimization.html)) has a substantive impact on the optimization procedure.  Notice that, with the rescaling of the parameters, that the number of iterations required to reach a solution was approximately 20% lower and that the SSE at the optimal solution is smaller.  Thus, this appears to be a "better" solution than what was found above.
+Let's see if rescaling the parameters (see the Optimization portion of the [Preliminaries Vignette](https://fishr.wordpress.com/books/aiffd/)) has a substantive impact on the optimization procedure.  Notice that, with the rescaling of the parameters, that the number of iterations required to reach a solution was approximately 20% lower and that the SSE at the optimal solution is smaller.  Thus, this appears to be a "better" solution than what was found above.
 ```{r}
 par.scale <- c(1e-4,rep(1,length(d6$catch)),rep(1,length(d6$catch)))  # Set parameter scales
 ABoptim3 <- optim(par,ABsse,catch=d6$catch,A=d6$aIndex,R=d6$rIndex,M=M,
@@ -472,9 +466,9 @@ Note, as a general rule-of-thumb I would use all three main algorithms in `optim
 
 
 ### Comparison to Results in Box 8.6
-The results shown in Box 8.6 (actually taken from the Excel spreadsheet provided on the book CD) can be loaded from the [`box8_6.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_6.txt).
+The results shown in the box (actually taken from the Excel spreadsheet provided on the book CD) can be loaded from the [Box8_6res.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_6res.txt).
 ```{r}
-res <- read.table("data/box8_6res.txt",header=TRUE)
+res <- read.table("data/Box8_6res.txt",header=TRUE)
 str(res)
 ```
 
@@ -490,7 +484,7 @@ compTbl <- data.frame(year=d6$year,NhatBFGS=round(Nhat,0),NhatBook=res$Nhat,
                       Npdiff=(round(Nhat,0)-res$Nhat)/res$Nhat*100,RhatBFGS=round(Rhat,0),
                       RhatBook=res$Rhat,Rpdiff=(round(Rhat,0)-res$Rhat)/res$Rhat*100)
 ```
-The effect of these different parameter findings on estimates of adult and pre-recruit abundance can be seen by combining the BFGS results from above with the results from the Box into one table.  From this it appears that the results shown here provide estimates that are approximately `r formatC(mean(compTbl$Npdiff),format="f",digits=1)}% lower for adults and `r formatC(mean(compTbl$Rpdiff),format="f",digits=1)}% lower for pre-recruits.  Effectively the results from using the BFGS optimization algorithm here matches the results from the Excel solver routine used to produce Box 8.6.
+The effect of these different parameter findings on estimates of adult and pre-recruit abundance can be seen by combining the BFGS results from above with the results from the Box into one table.  From this it appears that the results shown here provide estimates that are approximately `r formatC(mean(compTbl$Npdiff),format="f",digits=1)`% lower for adults and `r formatC(mean(compTbl$Rpdiff),format="f",digits=1)`% lower for pre-recruits.  Effectively the results from using the BFGS optimization algorithm here match the results from the Excel solver routine used to produce the box.
 ```{r}
 compTbl <- data.frame(year=d6$year,NhatBFGS=round(Nhat,0),NhatBook=res$Nhat,
                       Npdiff=(round(Nhat,0)-res$Nhat)/res$Nhat*100,RhatBFGS=round(Rhat,0),
@@ -499,14 +493,13 @@ round(compTbl,1)
 ```
 
 
-
-##  8.7 Application of Surplus Production Modeling
-The commercial fishery for a population of alewife *Alosa pseudoharengus* was monitored from 1985 to 2001.  Each year, the total weight of the catch (`catch`) and the total effort (`effort`) were recorded, providing $\frac{C}{f}$ as a measure of relative abundance.  These data were analyzed using a surplus production model to estimate carrying capacity ($K$), initial biomass ($B_{0}$), catchability ($q$), and the intrinsic rate of growth ($r$) for this fishery population.
+## Application of Surplus Production Modeling
+The commercial fishery for a population of Alewife (*Alosa pseudoharengus*) was monitored from 1985 to 2001.  Each year, the total weight of the catch (`catch`) and the total effort (`effort`) were recorded, providing $\frac{C}{f}$ as a measure of relative abundance.  These data were analyzed using a surplus production model to estimate carrying capacity ($K$), initial biomass ($B_{0}$), catchability ($q$), and the intrinsic rate of growth ($r$) for this fishery population.
 
 ### Preparing Data
-The [`box8_7.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_7.txt) is read, the structure is observed, and a new variable containing the catch-per-unit-effort is appended to the data frame.
+The [Box8_7.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_7.txt) is read, the structure is observed, and a new variable containing the catch-per-unit-effort is appended to the data frame.
 ```{r}
-d7 <- read.table("data/box8_7.txt",header=TRUE)
+d7 <- read.table("data/Box8_7.txt",header=TRUE)
 str(d7)
 d7$cpe <- d7$catch/d7$effort
 ```
@@ -582,7 +575,7 @@ lines(d7$year,res3$predCPE,lwd=2,col="red")
 ```
 
 ### Comparison to Results in Box 8.7
-The optimal parameters found with Excel solver and shown in Box 8.7 are entered into a vector and then sent to `SPsse()` to compute the SSE given the data and those parameter values.  As can be seen below, the SSE given the parameter values here and in the box are essentially the same.  The parameter estimates are, however, slightly different.
+The optimal parameters found with Excel solver and shown in the box are entered into a vector and then sent to `SPsse()` to compute the SSE given the data and those parameter values.  As can be seen below, the SSE given the parameter values here and in the box are essentially the same.  The parameter estimates are, however, slightly different.
 ```{r}
 parsbox <- c(732506,1160771,0.0001484,0.4049) # put all parameters into one vector
 names(parsbox) <- c("B0","K","q","r")         # name the parameters
@@ -591,7 +584,7 @@ res2$sse
 cbind(SPoptim1$par,parsbox)
 ```
 
-The estimates of `B` and `CPE` and the percent differences are computed below.  Thus, effectively, the results from using the Nelder-Mead optimization algorithm here matches the results from the Excel solver routine used in the Box.
+The estimates of `B` and `CPE` and the percent differences are computed below.  Thus, effectively, the results from using the Nelder-Mead optimization algorithm here match the results from the Excel solver routine used in the Box.
 ```{r}
 compTbl <- data.frame(year=d7$year,BNM=round(res3$predB,0),BBox=round(res2$predB,0),
                       CPENM=round(res3$predCPE,1),CPEBox=round(res2$predCPE,1))
@@ -602,24 +595,23 @@ round(pdiffTbl,1)
 ```
 
 
-
-##  8.8 Production Estimation Based on the Instantaneous Growth Rate Method
-Density, mean weight, and biomass (and associated variances) of a brook trout *Salvelinus fontinalis* population in Valley Creek, Minnesota, were estimated in a stream reach with an area of 0.181 ha on four dates between March 1974 and March 1975 [@Waters 1999].  Population statistics for two of these dates are presented below in order to illustrate how to estimate production using the instantaneous growth rate method.
+## Production Estimation Based on the Instantaneous Growth Rate Method
+Density, mean weight, and biomass (and associated variances) of a Brook Trout (*Salvelinus fontinalis*) population in Valley Creek, Minnesota, were estimated in a stream reach with an area of 0.181 ha on four dates between March 1974 and March 1975 [@Waters1999].  Population statistics for two of these dates are presented below in order to illustrate how to estimate production using the instantaneous growth rate method.
 
 ### Ogle Comment
-The computations of Box 8.8 form an example of the increment summation method for computing production.  Special purpose software (called Pop/Pro and made available with a description from [here](http://www4.ncsu.edu/~tkwak/pp.html)) has been developed to automate these calculations for more realistically complex situations.  This document will follow the example in Box 8.8 using R, but it should be noted that this is basically using R as a calculator.  More complex examples should use the Pop/Pro software.
+The computations of Box 8.8 form an example of the increment summation method for computing production.  Special purpose software (called Pop/Pro and made available with a description from [here](http://www4.ncsu.edu/~tkwak/pp.html)) has been developed to automate these calculations for more realistically complex situations.  This document will follow the example in the box using R, but it should be noted that this is basically using R as a calculator.  More complex examples should use the Pop/Pro software.
 
 ### Preparing Data
-The [`box8_8.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_8.txt) is read and the structure is observed.  The natural log of the mean weight variable (i.e., `meanw`) will ultimately be needed in the calculations below and is added to the data frame.  The variance of the log mean weight is given in the main text with equation 8.51 and is also added to the data frame
+The [Box8_8.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_8.txt) is read and the structure is observed.  The natural log of the mean weight variable (i.e., `meanw`) will ultimately be needed in the calculations below and is added to the data frame.  The variance of the log mean weight is given in the main text with equation 8.51 and is also added to the data frame
 ```{r}
-d8 <- read.table("data/box8_8.txt",header=TRUE)
+d8 <- read.table("data/Box8_8.txt",header=TRUE)
 str(d8)
 d8$logmeanw <- log(d8$meanw)
 d8$var.logmeanw <- d8$var.meanw/(d8$meanw^2)
 ```
 
 The two sample times were then separated into individual data frames using `Subset()`, which requires the original data frame as the first argument and a conditioning statement as the second argument.
-```{r}
+```{r R.options=list(width=100)}
 ( d8a <- Subset(d8,date=="8Mar74") )
 ( d8b <- Subset(d8,date=="29Jul74") )
 ```
@@ -636,13 +628,13 @@ var.P1 <- var.meanB*(G^2)+var.G*(meanB^2)        # equation 8.48
 cbind(d8a$age,meanB,var.meanB,G,var.G,P1,var.P1) # make a table for display purposes only
 ```
 
-Note that the units of `P1` in this case are grams per sampled reach.  It was noted in Box 8.8 that the sampled reach represented 0.181 ha.  Thus, if the `P1` values from above are divided by 0.181 then the spatial units will be hectares and if divided by 1000 the weight units will be kg for a final set of units of kg/ha.  Notice that if the mean is divided by 0.181 and 1000 then the corresponding variance must be divided by the *square* of these constants (as noted in the box).
+Note that the units of `P1` in this case are grams per sampled reach.  It was noted in the box that the sampled reach represented 0.181 ha.  Thus, if the `P1` values from above are divided by 0.181 then the spatial units will be hectares and if divided by 1000 the weight units will be kg for a final set of units of kg/ha.  Notice that if the mean is divided by 0.181 and 1000 then the corresponding variance must be divided by the *square* of these constants (as noted in the box).
 ```{r}
 ( P <- P1/0.181/1000 )
 var.P <- var.P1/(0.181^2)/(1000^2)
 ```
 
-As noted in the Box, approximate confidence intervals for $P$ are constructed using standard normal theory.
+As noted in the box, approximate confidence intervals for $P$ are constructed using standard normal theory.
 ```{r}
 conf.level <- 0.95
 ( z <- qnorm(1-(1-conf.level)/2) )
@@ -672,14 +664,13 @@ legend("topright",legend=c("8Mar74","29Jul74"),pch=19,col=c("red","blue"),lwd=1)
 ```
 
 
-
-##  8.9 Production Estimation Based on the Size-Frequency Method
-Density and mean weight (and associated variances) of a rainbow trout *Oncorhynchus mykiss* population in Valley Creek, Minnesota, were estimated in a stream reach on three dates between April 1977 and April 1978 [@GarmanWaters1983].  The catch data were broken into 10 size-groups in order to allow investigators to estimate production using the size-frequency method.
+## Production Estimation Based on the Size-Frequency Method
+Density and mean weight (and associated variances) of a Rainbow Trout (*Oncorhynchus mykiss*) population in Valley Creek, Minnesota, were estimated in a stream reach on three dates between April 1977 and April 1978 [@GarmanWaters1983].  The catch data were broken into 10 size-groups in order to allow investigators to estimate production using the size-frequency method.
 
 ### Preparing Data
-The [`box8_9.txt`](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_9.txt) is read and the structure is observed.
+The [Box8_9.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box8_9.txt) is read and the structure is observed.
 ```{r}
-d9 <- read.table("data/box8_9.txt",header=TRUE)
+d9 <- read.table("data/Box8_9.txt",header=TRUE)
 str(d9)
 ```
 
@@ -700,12 +691,12 @@ Ndiff3 <- d9$meanN[c-1]-d9$meanN[c]
 ( Ndiff <- c(Ndiff1,Ndiff2,Ndiff3) )
 ```
 
-The final result of equation 8.52, i.e., the estimate of production ($P$, is then computed.  The difference between this result and the result shown in Box 8.9 (i.e,. `r round(0.5*c*sum(d9$meanw*Ndiff)*0.333,2)`) is completely due to the fact that I divide by 3 here whereas the author of Box 8.9 multiplied by 0.333.
+The final result of equation 8.52, i.e., the estimate of production ($P$), is then computed.  The difference between this result and the result shown in the box is completely due to the fact that I divide by 3 here whereas the author of the box multiplied by 0.333.
 ```{r}
 ( Phat1 <- 0.5*c*sum(d9$meanw*Ndiff)/CPI )
 ```
 
-The variance of $P$ is computed below using a similar "trick" as above.  Again, note that the difference in the result here and in Box 8.9 is due to dividing by three or multiplying by 0.333.
+The variance of $P$ is computed below using a similar "trick" as above.  Again, note that the difference in the result here and in the box is due to dividing by three or multiplying by 0.333.
 ```{r}
  # note the "plus" in the first term below
 wdiff <- c(d9$meanw[1]+d9$meanw[2],d9$meanw[1:(c-2)]-d9$meanw[3:c],d9$meanw[c-1]-d9$meanw[c])
@@ -736,9 +727,8 @@ reproInfo(rqrdPkgs=rqrd,elapsed=et["user.self"]+et["sys.self"])
 ```
 
 ```{r echo=FALSE, results='hide', message=FALSE}
-purl2("Chapter4.Rmd",moreItems=c("source","rqrd","stime"))    # Will create the script file
+purl2("Chapter8.Rmd",moreItems=c("source","rqrd","stime"))    # Will create the script file
 ```
-
 
 --------------------------------------------------------------
 ## References
