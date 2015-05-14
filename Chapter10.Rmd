@@ -1,0 +1,428 @@
+---
+title: "AIFFD Chapter 10 - Condition"
+author: "Derek H. Ogle"
+csl: american-fisheries-society.csl
+output:
+  pdf_document:
+    fig_height: 3
+    fig_width: 3
+    number_sections: yes
+    pandoc_args: --number-offset=10
+    toc: yes
+    toc_depth: 2
+  html_document:
+    fig_height: 4.5
+    fig_width: 4.5
+    highlight: tango
+    number_sections: yes
+    pandoc_args: --number-offset=10
+    toc: yes
+    toc_depth: 2
+bibliography: AIFFDReferences.bib
+---
+\setcounter{section}{10}
+
+```{r echo=FALSE, include=FALSE}
+stime <- proc.time()    # Start time to get processing time
+source('knitr_setup.R')
+```
+
+--------------------------------------------------------------
+
+This document contains R versions of the boxed examples from **Chapter 10** of the "Analysis and Interpretation of Freshwater Fisheries Data" book.  Some sections build on descriptions from previous sections, so each section may not stand completely on its own.  More thorough discussions of the following items are available in linked vignettes:
+
+* the use of linear models in R in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/),
+* differences between and the use of type-I, II, and III sums-of-squares in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/), and
+* the use of "least-squares means" is found in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/).
+
+The following additional packages are required to complete all of the examples (with the required functions noted as a comment and also noted in the specific examples below).
+
+```{r echo=-1, warning=FALSE, message=FALSE}
+rqrd <- c("FSA","car","multcomp","lattice")
+library(FSA)          # Summarize, fitPlot, residPlot, addSigLetters, lencat, headtail
+library(NCStats)      # addSigLetters
+library(car)          # Anova
+library(multcomp)     # glht, mcp
+library(lattice)      # xyplot
+```
+
+In addition, external tab-delimited text files are used to hold the data required for each example.  These data are loaded into R in each example with `read.table()`.  Before using `read.table()` the working directory of R must be set to where these files are located on **your** computer.  The working directory for all data files on **my** computer is set with
+
+```{r}
+setwd("C:/aaaWork/Web/fishR/BookVignettes/aiffd2007")
+```
+
+In addition, I prefer to not show significance stars for hypothesis test output, reduce the margins on plots, alter the axis label positions, make all axis tick labels horizontal, and reduce the axis tick length.  In addition, contrasts are set in such a manner as to force R output to match SAS output for linear model summaries.  All of these options are set with
+```{r eval=FALSE}
+options(width=90,continue=" ",show.signif.stars=FALSE,
+        contrasts=c("contr.sum","contr.poly"))
+par(mar=c(3.5,3.5,0.5,0.5),mgp=c(2.1,0.4,0),las=1,tcl=-0.2)
+```
+
+
+
+## Transformation and Regression Analyses of Weight-Length Data -- Comparing the Condition of Two Populations
+Data collected are total length (`TL`; mm), weight (`WT`;g), and body fat as a percentage of overall wet weight for samples of Yellowstone Cutthroat Trout (*Oncorhynchus clarkia*) collected in midsummer from three locations that could influence individual weight at length: a lower-elevation stream (1,810 m elevation), a lower-elevation lake (1,785 m), and a higher-elevation lake (2,610 m).  Fat values were randomly generated for example only.  Fish samples were collected via electroshocking, gill nets, and angling.
+
+### Preparing Data
+The [Box10_1.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box10_1.txt) is read, the structure of the data frame is observed, and common log transformations of the total length (`TL`) and weight (`WT`) variables are appended to the data frame.
+```{r}
+d1 <- read.table("data/Box10_1.txt",header=TRUE)
+str(d1)
+d1$logTL <- log10(d1$TL)
+d1$logWT <- log10(d1$WT)
+str(d1)
+```
+
+In the box the authors perform separate analyses for the Cutthroat Trout from "population A" and "population B."  To facilitate these analyses, I created two new data frames using `Subset()` (from the `FSA` package) that will separately contain just the fish from these two populations.  The `Subset()` function requires two arguments.  The first argument is the data frame from which the subset should be extracted.  The second argument is a "conditioning statement" that explains how the subset should be constructed.   The structure for each data frame shows that the number of levels for the `POP` variable is only one, indicating that the subsetting was successful.
+```{r}
+d1A <- Subset(d1,POP=="A")
+str(d1A)
+d1B <- Subset(d1,POP=="B")
+str(d1B)
+```
+                                   
+### Linear Regression of the Transformed Data
+The linear regression model is fit in R with `lm()` with a model formula of the form `response`~`explanatory` and a `data=` argument where the variables are contained.  The ANOVA table, coefficients summary table, and confidence intervals for the coefficients are extracted by submitting the saved `lm` object to `anova()`, `summary()` (or `coef()`), and `confint()`, respectively.
+```{r}
+lm1 <- lm(logWT~logTL,data=d1A)
+anova(lm1)
+summary(lm1)
+confint(lm1)
+```
+
+A summary graphic of the regression model fit is obtained with `fitPlot()` (from the `FSA` package) which requires the saved `lm` object as its first argument.  In addition, the x- and y-axes can be labeled as usual and the default main graphic label can be suppressed by including `main=""`.  A residual plot for assessing linearity and homoscedasticity is constructed with `residPlot()` (from the `FSA` package), again submitting only the saved `lm` object as an argument.
+```{r}
+fitPlot(lm1,xlab="log10(Total Length)",ylab="log10(Weight)",main="")
+```
+```{r fig.width=7, fig.height=3.5}
+residPlot(lm1)
+```
+
+A similar analysis can be easily constructed for "population B" (note change in `data=`.
+```{r}
+lm2 <- lm(logWT~logTL,data=d1B)
+anova(lm2)
+summary(lm2)
+confint(lm2)
+```
+
+The text in the box suggests that the authors are interested in predicting the mean weights of 250, 300, and 450 mm trout from each population.  These calculations are constructed with `predict()`.  This function requires the saved linear model as the first object and a data frame of values of the explanatory variable at which predictions of the response variable should be made as the second argument.  Finally, a confidence interval for the mean can be constructed by including the `interval="c"` argument or a prediction interval for an individual can be constructed with the `interval="p"` argument.  In this example, it is very important to note that the new values in the second argument must be contained within a data frame (thus, the use of `data.frame()`) and that the variable name in that data frame has to be exactly the same as it was in the saved linear model.  It is also important to note that the predictions from this model are on the common log scale.  Thus, predictions on the raw weight scale are obtained by back-transforming the model predictions -- i.e., raising the model predictions to the power of 10.  
+```{r}
+lens <- c(250,300,450)    # setup lengths
+predA.logwt <- predict(lm1,data.frame(logTL=log10(lens)),interval="c")
+10^(predA.logwt)          # back-transform to raw weights
+predB.logwt <- predict(lm2,data.frame(logTL=log10(lens)),interval="c")
+10^(predB.logwt)
+```
+
+### Non-Linear Regression on Untransformed Data
+Non-linear regressions in R are performed with `nls()`, which requires three arguments.  The first argument is a formula for the model.  This formula must include the names of the response and explanatory variables as they appear in the data frame and parameter symbols.  The second required argument is to include the name of the data frame containing the response and explanatory variables in the `data=` argument.  The third required argument is a list of starting values for the model parameters.  This list of starting values is required to give the iterative optimization algorithm a place to start and to tell R which "symbols" in the model formula are model parameters (with the "other" symbols assumed to be variables).  Finally, if you want to watch the iterations of the algorithm (which is generally not necessary) you can include the `trace=TRUE` argument (the default is `trace=FALSE) but I will turn this option on to more closely match the box results).  As always with R, the results of the R constructor function should be saved to an object so that particular results can be extracted.  Thus, the non-linear regression model for "population A" is fit in R, with starting values of A=0.000001 and B=3.0 (which are likely to be globally reasonable starting values for this model and is what is used in the box).
+```{r}
+nls1 <- nls(WT~A*TL^B,data=d1A,start=list(A=0.000001,B=3.0),trace=TRUE)
+```
+
+The columns of results from the iterations shown above correspond to the error sums-of-squares (SS), estimate of A, and estimate of B.  These results nearly perfectly match those from SAS.
+
+The summary parameter estimates (with a correlation matrix for the parameter estimates) and parameter confidence intervals are extracted by submitting the saved `nls` object to `summary()` and `confint()`.  Note that the confidence intervals provided by R are slightly different from those provided by SAS.  Generally speaking, the confidence intervals provided by these methods for non-linear models are poor.  It has been suggested that boot-strapping methods be used instead (bootstrapping for non-linear models is described in [Chapter 9 of the Introduction to Fisheries Analyses with R book](https://fishr.wordpress.com/books/ifar/)).
+```{r}
+summary(nls1,corr=TRUE)
+confint(nls1)
+```
+
+A summary graphic of the model fit and the residual plot are obtained by submitting the `nls` object to `fitPlot()` and `residPlot()` as described above.  Note the strong heteroscedasticity present in the non-linear regression model.
+```{r}
+fitPlot(nls1,xlab="Total Length",ylab="Weight",main="")
+```
+```{r fig.width=7, fig.height=3.5}
+residPlot(nls1)
+```
+
+Finally, predictions from the non-linear regression model can be obtained with `predict()` as shown above.  However, note that intervals can not be computed with `predict()` as shown for the linear model.  In general, prediction intervals must be computed with bootstrapping techniques.
+```{r}
+predict(nls1,data.frame(TL=lens))
+```
+
+
+## Analysis of Covariance (ANCOVA)
+The ANCOVA can be used to test for differences between regression parameters (i.e., slopes and intercepts) and is especially appropriate when the length ranges sampled in the populations to be compared are generally unequal.
+
+A rough method for comparing slopes from the linear regression between two groups was described in  [Box 10.1](#transformation-and-regression-analyses-of-weight-length-data-comparing-the-condition-of-two-populations).  A more general and precise method for comparing slopes (and entire regression models) is described in the box and is shown below.  This methodology is discussed in more detail in [Chapter 5 of the Introductory Fisheries Analysis with R book](https://fishr.wordpress.com/books/ifar/).
+
+### Preparing Data
+The same basic data used in [Box 10.1](#transformation-and-regression-analyses-of-weight-length-data-comparing-the-condition-of-two-populations) is used here.  However, the example in the box requires a data frame that has all the fish from both "population A" and "population B."  This is most easily accomplished in this situation by creating a subset of the original data frame excluding the fish from "population C."
+```{r}
+d1AB <- Subset(d1,POP!="C")
+str(d1AB)
+```
+
+The full model discussed in the box is fit using `lm()` and a formula of the form `response`~`explanatory*factor`.  R will interpret this formula as a short-hand notation for a formula of the form `response`~`explanatory`+ `factor`+ `explanatory:factor`, which is prescribed for this analysis.  In addition, R knows to create a set of "dummy" or indicator variables from the levels represented in the `POP` variable because `POP` is a factor.  An ANOVA table using type-II SS is constructed by including the saved `lm` object into `Anova()` (from the `car` package) with the `type="II"` argument.  From this it is seen, with a non-significant interaction term, that there is no significant difference in the slope between the two populations.
+```{r}
+lm3 <- lm(logWT~logTL*POP,data=d1AB)
+Anova(lm3,type="II")
+```
+
+The reduced model fit in box 10.2 is fit with `lm()` using a modified formula and the ANOVA results are again extracted with `Anova()`.  As shown in the box, there appears to be a significant difference in the intercepts between the two populations.  The transformed length-weight relationship are parallel but not the same line between the two populations.  The model coefficients and confidence intervals from this final model fit are extracted and a graphic of the model fit is constructed as described above.
+```{r}
+lm3r <- lm(logWT~logTL+POP,data=d1AB)
+Anova(lm3r,type="II")
+summary(lm3r)
+confint(lm3r)
+fitPlot(lm3r,xlab="log10 Total Length",ylab="log10 Weight",main="",legend="topleft")
+```
+
+
+## Comparisons of Mean Relative Weight
+Mean comparison tests such as the two-sample t-test (or the non-parametric equivalent, Mann-Whitney test) or multiple-comparison tests such as ANOVA (or the non parametric Kruskal-Wallis test) can be used to examine length-related or inter-population trends in Wr (relative weight).  Herein, we discuss how one might test for difference in condition, as indexed by Wr, among length-groups from the same population or among populations.  For the Yellowstone Cutthroat Trout (*Oncorhynchus clarkia*) data presented in  [Box 10.1](#transformation-and-regression-analyses-of-weight-length-data-comparing-the-condition-of-two-populations) the question of interest is whether macro-scale habitat type (stream versus lake and low versus high elevation) has any significant influence on fish condition.
+
+Relative weights were calculated for the three populations described in  [Box 10.1](#transformation-and-regression-analyses-of-weight-length-data-comparing-the-condition-of-two-populations) based on the lotic and length standard-weight equations for Cutthroat Trout [@KruseHubert1997].  An important first step is to assess the distribution of the Wr data to determine whether a parametric or non parametric test is more appropriate.  This can be completed with typical assessments of normality, such as a histogram or box-plot of the data (not shown).  In this case, the data appears generally normal, but there is some skewness and outliers for all three populations.  It is important to assess whether the outliers (or individuals with extreme values when compared to the mean) are biologically relevant or errors due to measurement or data entry.  We retained the outliers in this assessment.
+
+Prior to comparing overall population means, it is prudent to check for length-related patterns in condition within each population [@Murphyetal1990; Murphyetal1991; Blackwelletal2000].  For example, changes in Wr with increasing length for Cutthroat Trout from the low-elevation stream population can be assessed by grouping Cutthroat Trout in 50-mm length categories (e.g., group one is 100-149 mm fish and group five is 300-349 mm fish plus the two largest fish).  Another way to group the fish is to use the five-cell model [@Gabelhouse1984] for stock-to-trophy length fish (see Cutthroat Trout length categories in @AndersonNeumann1996). The following R code calculates Wr values for individual fish and assigns each fish to a length-group for testing differences in Wr among length-groups by means of ANOVA, a test that is robust to small departures from normality.
+
+### Preparing Data
+The same data used in [Box 10.1](#transformation-and-regression-analyses-of-weight-length-data-comparing-the-condition-of-two-populations) and [Box 10.2](#analysis-of-covariance-ancova) is used here and will not be re-read.  However, standard weight and relative weight variables must be added to the data frame.  This is made slightly more difficult in this example because the standard weight equation for Cutthroat Trout differs depending on whether it is a lotic or lentic population.  In this example, fish in "population A" are lotic and fish in the other two populations are lentic.  Thus, I initially created a standard weight variable with no data in it and then populated that variable based on which population the fish was in.
+```{r}
+d1$WS <- as.numeric(NA)
+d1$WS[d1$POP=="A"] <- 10^(-5.189+3.099*d1$logTL[d1$POP=="A"])  # Lotic
+d1$WS[d1$POP!="A"] <- 10^(-5.192+3.086*d1$logTL[d1$POP!="A"])  # Lentic
+d1$WR <- (d1$WT/d1$WS)*100
+str(d1)
+```
+
+The authors also created a `GRP` variable based on the total length of the fish.  This variable can be created with a series of if-then statements as the authors did in the box.  However, it is more convenient to use `lencat()`, from the `FSA` package.  This function requires a formula of the form ~`len` where `len` is the generic length variable as the first argument and the corresponding data frame in `data=`.  There are two ways to use arguments to control how the categories are constructed.  First, a starting value can be given in the `startcat=` argument and a constant width of the categories given in the `w=` argument.  Alternatively, a sequence of lower boundaries for the categories can be given in the `breaks=` argument.  The first method cannot be used in this example because the authors' last group is wider than the first four groups.  The results of `lencat()` should be saved into a data frame which, by default, will have a new variable called `LCat` (the name of variable can be modified by including a new name in the `vname=` argument.
+```{r}
+d1 <- lencat(~TL,data=d1,breaks=c(100,150,200,250,300),vname="GRP")
+levels(d1$GRP)
+headtail(d1)
+```
+
+Finally, the authors focused part of their analysis on the Cutthroat Trout from "population A."  To facilitate this analyses in R I created a new data frame using `Subset()` that contained just the fish from this population (note that this subset was created in BOX 10.1 but need to be re-created here so that it had the new variables just created).
+```{r}
+d1A <- Subset(d1,POP=="A")
+str(d1A)
+```
+                                   
+### One-Way ANOVA Comparison Between Length Groups
+The one-way ANOVA model is fit in R with `lm()` using a formula of the form `response`~`factor`.  The ANOVA table, summary table, and a plot of the means are constructed by submitting the saved `lm` object to `anova()`, `summary()`, and `fitPlot()`, respectively, as described previously.
+```{r}
+lm1 <- lm(WR~GRP,data=d1A)
+anova(lm1)
+summary(lm1)
+fitPlot(lm1,xlab="Total Length Category",ylab="Relative Weight",main="")
+```
+
+A residual plot for assessing linearity and homoscedasticity and a histogram of residuals for assessing normality are constructed with `residPlot()` as described previously.
+```{r fig.width=7, fig.height=3.5}
+residPlot(lm1)
+```
+
+
+### Kruskal-Wallis Test Comparison Between Length Groups
+A non-parametric Kruskal-Wallis test to compare the median relative weight between length groups is conducted with `kruskal.test()`, which requires the same to arguments as used in `lm()`.
+```{r}
+kruskal.test(WR~GRP,data=d1A)
+```
+
+### One-Way ANOVA Comparison Among Populations
+The one-way ANOVA for comparing mean relative weight among the three populations is performed similarly.
+```{r}
+lm2 <- lm(WR~POP,data=d1)
+anova(lm2)
+summary(lm2)
+Summarize(WR~POP,data=d1,digits=2)
+fitPlot(lm2,xlab="Population",ylab="Relative Weight",main="")
+```
+
+```{r fig.width=7, fig.height=3.5}
+residPlot(lm2)
+```
+
+
+## Analysis of Fat Composition Data
+In [Box 10.2](#comparisons-of-mean-relative-weight), we tested for differences in Wr within and among populations.  Here we examine whether those Wr values are related to whole-body fat content in individual fish and then test whether population mean fat content differs among populations.  Fat composition, a direct measure of individual wellness or energy stores, was estimated for the Yellowstone Cutthroat Trout sampled in stream and lake habitats (see  [Box 10.1](#transformation-and-regression-analyses-of-weight-length-data-comparing-the-condition-of-two-populations) for data).  We compared fat composition to Wr by means of correlation and regression analyses.  The question of interest is whether Wr is a good indicator of individual physiological fitness as referenced by tissue fat content.  Additionally, we want to know if using fat as the indicator of individual fitness results in a different conclusion regarding the population-level effects that elevation (a surrogate for environmental conditions such as temperature, growing season, and food supply) might have on fish condition.  Please note that in this example we did not check for length-related biases (e.g., potential differences among length categories) within each population.  The following R code regresses wet weight fat percentage against individual Wr (all populations combined into one data set) and compares mean percent fat composition among the three Yellowstone Cutthroat Trout populations by means of ANOVA.
+
+### Comparing Relative Weight to Fat Composition
+The linear regression is fit and the ANOVA and summary tables, summary graphic, residual plots, and histogram of residuals are constructed as described previously.
+```{r}
+lm3 <- lm(FAT~WR,data=d1)
+anova(lm3)
+summary(lm3)
+fitPlot(lm3,xlab="Relative Weight",ylab="Fat Composition",main="")
+```
+
+```{r fig.width=7, fig.height=3.5}
+residPlot(lm3)
+```
+
+### Testing Fat Composition Differences Among Populations
+The one-way ANOVA and results are fit as described previously.
+```{r}
+lm4 <- lm(FAT~POP,data=d1)
+anova(lm4)
+Summarize(FAT~POP,data=d1,digits=2)
+```
+```{r fig.width=7, fig.height=3.5}
+residPlot(lm4)
+```
+
+The Tukey multiple comparisons results are obtained by submitting the `lm` object as the first argument to `glht()`, from the `multcomp` package.  This function requires a second argument that indicates which type of multiple comparison procedure to use.  This second argument uses `mcp()` which requires the factor variable set equal to the word "Tukey" to perform the Tukey multiple comparison procedure.  The saved `glht` object is submitted to `summary()` to get the difference in means with a corresponding hypothesis test p-value among each pair of groups and to `confint()` to get the corresponding confidence intervals for the difference in means.  In addition, submitting the saved `glht` object to `cld()` will produce "significance letters" to indicate which means are different (different letters mean different means).
+```{r}
+mc1 <- glht(lm4,mcp(POP="Tukey"))
+summary(mc1)
+confint(mc1)
+cld(mc1)
+```
+
+A graphic of the model results is obtained with `fitPlot()` (as noted above) and the significance letters are placed on the means plot with `addSigLetters()` (`addSigLetters()` is from the `FSA` package.  You should examine the help for this function to see what each of the arguments is used for).
+
+```{r}
+fitPlot(lm4,xlab="Population",ylab="Fat Composition",main="")
+addSigLetters(lm4,lets=c("a","b","b"),pos=c(2,2,4))
+```
+
+
+## Morphological Assessment of Juvenile Condition
+The following data are used to assess effects of starvation on body condition of largemouth bass (*Micropterus salmoides*) juveniles.  For most fishes, standard condition indices (e.g., Wr) are applicable to only adults and large juveniles because weight measures are imprecise for small fish.  A controlled experiment was conducted to determine if simple morphological measurements could be used to determine condition of juvenile largemouth bass (partial data set from @Smithetal2005).  Hatchery-reared largemouth bass were raised until completion of fin development and then divided into two experimental groups of fed and unfed fish.  Differences in body morphology existed after only 3 d (days) of food deprivation, and a simple bivariate ratio of body depth at the anus to standard length was almost as efficient and robust at classifying fed and unfed largemouth bass as a multivariate index based on 23 morphometric characters.  Here we provide an assessment of differences in the body depth after 6 d (days) of food deprivation.
+
+### Preparing Data
+The [Box10_5.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box10_5.txt) is read and the structure of the data frame is observed.
+```{r}
+d <- read.table("data/Box10_5.txt",header=TRUE)
+str(d)
+```
+                                   
+### Comparison of Regressions Between Groups
+The full model discussed in the box is fit using `lm()` as described previously.  An ANOVA table using type-II SS is constructed by including the saved `lm` object to `Anova()` (from the `car` package) with the `type="II"` argument.  From this it is seen, with a non-significant interaction term, that there is no significant difference in the slope between the two groups.
+```{r}
+lm1 <- lm(BD~SL*food,data=d)
+Anova(lm1,type="II")
+```
+
+The reduced model fit in box 10.5 is fit in R and ANOVA results extracted below.  As shown in the box, there appears to be a significant difference in the intercepts between the two populations.  Thus the transformed length-weight relationship are parallel but not the same line between the two populations.  The model coefficients and confidence intervals from this final model fit are extracted with `summary()` and `confint()`, respectively.  The graphic of the model fit is again created with `fitPlot()`.
+
+```{r}
+lm1r <- lm(BD~SL+food,data=d)
+Anova(lm1r,type="II")
+summary(lm1r)
+confint(lm1r)
+fitPlot(lm1r,xlab="Standard Length (mm)",ylab="Body Depth (mm)",main="",legend="topleft")
+```
+
+The model diagnostics are constructed as shown above.
+```{r fig.width=7, fig.height=3.5}
+residPlot(lm1r)
+```
+
+
+## Use of Fulton's Condition to Assess the Effects of Parasites
+Parasites may negatively affect the condition of fish.  Here we determine if condition of Arkansas River shiners (*Notropis girardi*) (29-60 mm TL) is reduced when fish are parasitized by anchor worm, a cosmopolitan cyclopoid copepod.  Arkansas River shiners were captured with a seine (see @Hayesetal1996 for a discussion of this gear), measured (`TL`; mm), weighed (0.1 g), and inspected to determine the presence of the parasite (partial data set from @Durhametal2002).  Differences in condition among fish with and without the parasite were assessed using ANOVA to test differences in Fulton's condition (K), an appropriate assessment metric as the fish are from a single population over identical size ranges.  Individual fish from this experiment were treated as the experimental unit because our research questions asked if differences in condition existed between two populations of Arkansas River shiners (population contained parasites (`with`) and population contained no parasites(`without`)).
+
+### Preparing Data
+The [Box10_6.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box10_6.txt) is read, the structure of the data frame is observed, and a random six rows are observed.  Log-transformed versions of the `TL` and `WT` variables and a variable containing Fulton's condition factor for each fish were appended to the data frame.  Note that the data is organized here in a stacked format rather than the unstacked format presented in the box.
+```{r}
+d6 <- read.table("data/Box10_6.txt",header=TRUE)
+str(d6)
+d6$logTL <- log10(d6$TL)
+d6$logWT <- log10(d6$WT)
+d6$K <- d6$WT/(d6$TL^3)*10000   # Fulton's condition factor
+headtail(d6)                        # six random rows from the data frame
+```
+
+The authors perform separate regressions for the shiners with and without the parasite.  To facilitate these analyses in R I created new data frames using `Subset()` that will separately contain just the fish from the two groups based on the presence of the parasite.
+```{r}
+d6w <- Subset(d6,Lernaea=="with")
+str(d6w)
+d6wo <- Subset(d6,Lernaea=="without")
+str(d6wo)
+```
+
+### Summary Statistics for Both Groups
+The summary statistics presented in the box are computed with `Summarize()`, from the `FSA` package.  In this example, this function requires, as the first argument, a formula of the form `quantitative~factor` where `quantitative` is the generic representation of the quantitative variable and `factor` is the generic representation of the group classification or factor variable.  The second argument -- i.e., `data=` argument -- contains a data frame which holds the quantitative and factor variables.
+```{r}
+Summarize(TL~Lernaea,data=d6)
+Summarize(WT~Lernaea,data=d6)
+Summarize(K~Lernaea,data=d6)
+```
+
+### Separate Length-Weight Regressions
+The two regressions demonstrated in the box are constructed with `lm()` followed by the use of `anova()`, `summary()`, and `confint()`, as illustrated above.
+```{r}
+lmw <- lm(logWT~logTL,data=d6w)
+anova(lmw)
+summary(lmw)
+confint(lmw)
+lmwo <- lm(logWT~logTL,data=d6wo)
+anova(lmwo)
+summary(lmwo)                                                                                                        
+confint(lmwo)
+```
+
+### Comparing Length-Weight Regressions
+```{r echo=FALSE, results='hide'}
+# for Sexpr below
+lmc <- lm(logWT~logTL*Lernaea,data=d6)
+```
+The authors of the box did not compare, for example, the log weight and log total length regression between groups with or without the anchor worms.  However, this is accomplished simply with a formula in `lm()` modified for an ANCOVA (as described previously).  The significant interaction term (`r kPvalue(Anova(lmc,type="II")[3,"Pr(>F)"])`) indicates that the slope of the log weight to log total length regression differs significantly between the two groups.  The fitted line plot indicated that the rate of increase of log weight for increasing log total length is greater when the anchor worms are not present then when they are present.
+```{r}
+lmc <- lm(logWT~logTL*Lernaea,data=d6)
+Anova(lmc,type="II")
+summary(lmc)
+fitPlot(lmc,xlab="log10 Total Length",ylab="log10 Weight",main="",legend="topleft")
+```
+
+A residual plot suggests a potential outlier in the data set and a possible slight heteroscedasticity in the group with anchor worms.
+```{r fig.width=7, fig.height=3.5}
+residPlot(lmc,main="")
+```
+
+### Separate One-Way ANOVAs
+The separate ANOVAs demonstrated in the box are computed below.
+```{r}
+lmTL <- lm(TL~Lernaea,data=d6)
+anova(lmTL)
+summary(lmTL)
+lmWT <- lm(WT~Lernaea,data=d6)
+anova(lmWT)
+summary(lmWT)
+lmK <- lm(K~Lernaea,data=d6)
+anova(lmK)
+summary(lmK)
+```
+
+### Visualizations I
+The plots depicted on the last page of the box are constructed by first plotting the points for only when the parasite is present using `plot()` and then adding the points for when the parasite was not present with `points()`.
+```{r}
+plot(WT~TL,data=d6,subset=Lernaea=="with",ylab="Wt(g)",xlab="TL (mm)",pch=16)
+points(WT~TL,data=d6,subset=Lernaea=="without",pch=1)
+legend("topleft",legend=c("Lernaea present","Lernaea absent"),pch=c(16,1),cex=0.8)
+plot(logWT~logTL,data=d6,subset=Lernaea=="with",ylab="log10(Wt)",xlab="log10(TL)",pch=16)
+points(logWT~logTL,data=d6,subset=Lernaea=="without",pch=1)
+plot(K~TL,data=d6,subset=Lernaea=="with",ylab="K",xlab="TL (mm)",pch=16)
+points(K~TL,data=d6,subset=Lernaea=="without",pch=1)
+```
+
+### Visualizations II
+The graphics depicted below use `xyplot()`, from the `Lattice` package.
+```{r}
+xyplot(WT~TL,group=Lernaea,data=d6,xlab="Total Length (mm)",ylab="Weight(g)",auto.key=TRUE)
+xyplot(WT~TL,group=Lernaea,data=d6,xlab="Total Length (mm)",ylab="Weight(g)",pch=c(16,1),
+       col="black",key=list(text=list(c("Lernaea present","Lernaea absent")),
+                            points=list(pch=c(16,1),col="black")))
+xyplot(K~TL,group=Lernaea,data=d6,xlab="Total Length (mm)",ylab="K",pch=c(16,1),
+       col="black",key=list(text=list(c("Lernaea present","Lernaea absent")),
+                            points=list(pch=c(16,1),col="black")))
+```
+
+--------------------------------------------------------------
+
+```{r echo=FALSE}
+et <- proc.time() - stime
+reproInfo(rqrdPkgs=rqrd,elapsed=et["user.self"]+et["sys.self"])
+```
+
+```{r echo=FALSE, results='hide', message=FALSE}
+purl2("Chapter10.Rmd",moreItems=c("source","rqrd","stime"))    # Will create the script file
+```
+
+--------------------------------------------------------------
+## References
