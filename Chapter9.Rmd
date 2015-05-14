@@ -1,0 +1,305 @@
+---
+title: "AIFFD Chapter 9 - Size Structure"
+author: "Derek H. Ogle"
+csl: american-fisheries-society.csl
+output:
+  html_document:
+    fig_height: 4.5
+    fig_width: 4.5
+    highlight: tango
+    number_sections: yes
+    pandoc_args: --number-offset=9
+    toc: yes
+    toc_depth: 2
+  pdf_document:
+    fig_height: 3
+    fig_width: 3
+    number_sections: yes
+    pandoc_args: --number-offset=9
+    toc: yes
+    toc_depth: 2
+bibliography: AIFFDReferences.bib
+---
+\setcounter{section}{9}
+
+```{r echo=FALSE, include=FALSE}
+stime <- proc.time()    # Start time to get processing time
+source('knitr_setup.R')
+```
+
+--------------------------------------------------------------
+
+This document contains R versions of the boxed examples from **Chapter 9** of the "Analysis and Interpretation of Freshwater Fisheries Data" book.  Some sections build on descriptions from previous sections, so each section may not stand completely on its own.  More thorough discussions of the following items are available in linked vignettes:
+
+* the use of linear models in R in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/),
+* differences between and the use of type-I, II, and III sums-of-squares in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/), and
+* the use of "least-squares means" is found in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/).
+
+
+The following additional packages are required to complete all of the examples (with the required functions noted as a comment and also noted in the specific examples below).
+
+```{r echo=-1, warning=FALSE, message=FALSE}
+rqrd <- c("FSA","NCStats","lattice","multcomp","nlme","pgirmess","TeachingDemos")
+library(FSA)           # Summarize, fitPlot, addSigLetters, residPlot
+library(NCStats)       # chisqPostHoc
+library(lattice)       # bwplot, xyplot
+library(multcomp)      # glht, mcp
+library(nlme)          # lme
+library(pgirmess)      # kruskalmc
+library(TeachingDemos) # chisq.detail
+```
+
+In addition, external tab-delimited text files are used to hold the data required for each example.  These data are loaded into R in each example with `read.table()`.  Before using `read.table()` the working directory of R must be set to where these files are located on **your** computer.  The working directory for all data files on **my** computer is set with
+
+```{r}
+setwd("C:/aaaWork/Web/fishR/BookVignettes/aiffd2007")
+```
+
+In addition, I prefer to not show significance stars for hypothesis test output, reduce the margins on plots, alter the axis label positions, and reduce the axis tick length.  In addition, contrasts are set in such a manner as to force R output to match SAS output for linear model summaries.  All of these options are set with
+```{r eval=FALSE}
+options(width=90,continue=" ",show.signif.stars=FALSE,
+        contrasts=c("contr.sum","contr.poly"))
+par(mar=c(3.5,3.5,1,1),mgp=c(2.1,0.4,0),tcl=-0.2)
+```
+
+
+## Testing for Differences in Mean Length by Means of Analysis of Variance (ANOVA)
+### Preparing Data
+The [Box9_1.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box9_1.txt) is read and the structure is observed below.
+```{r}
+d1 <- read.table("data/Box9_1.txt",header=TRUE)
+str(d1)
+```
+                                   
+### ANOVA Results
+The one-way ANOVA model is fit in R with `lm()` where the first argument is a formula of the form `response`~`factor` and the `data=` argument set equal to the data frame containing the variables.  The ANOVA table with type I SS is then extracted from the `lm` object with `anova()`.
+```{r}
+lm1 <- lm(length~lake,data=d1)
+anova(lm1)
+```
+
+### Multiple Comparisons -- Tukey Method
+The Tukey multiple comparisons results are obtained by submitting the `lm` object as the first argument to `glht()`,  from the `multcomp` package.  This function requires a second argument that indicates which type of multiple comparison procedure to use.  This second argument uses `mcp()` which requires the factor variable set equal to the word "Tukey" to perform the Tukey multiple comparison procedure.  The saved `glht` object is submitted to `summary()` to get the difference in means with a corresponding hypothesis test p-value among each pair of groups and to `confint()` to get the corresponding confidence intervals for the difference in means.  In addition, submitting the saved `glht` object to `cld()` will produce "significance letters" to indicate which means are different (different letters mean different means).
+```{r}
+mc1 <- glht(lm1,mcp(lake="Tukey"))
+summary(mc1)
+confint(mc1)
+cld(mc1)
+```
+
+A graphic of the model results is obtained with `fitPlot()`, from the `FSA` package, and the significance letters are placed on the means plot with `addSigLetters()`. (`addSigLetters()` is from the `NCStats` package.  You should examine the help for this function to see what each of the arguments is used for).
+```{r}
+fitPlot(lm1,ylab="Total Length (mm)",xlab="Lake",main="")
+addSigLetters(lm1,lets=c("c","a","b"),pos=c(2,2,4))
+```
+
+### Summary Table
+The summary table shown at the bottom of thebox (I would have preferred doing this at the beginning) is obtained with `Summarize()` from the `FSA` package.
+```{r}
+Summarize(length~lake,data=d1,digits=2)
+```
+
+
+
+## Testing for Differences among Length-Frequency Distributions by Means of the Kolmogorov-Smirnov Two-Sample Test
+### Preparing Data
+The [Box9_1.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box9_1.txt) used here is the same file used in [Box 9.1](#testing-for-differences-in-mean-length-by-means-of-analysis-of-variance-anova) and is not re-read here.  However, as the Kolmogorov-Smirnov method described in thebox is a two-sample method.  Thus, three new data frames, each of which contains only one of the lakes, must be constructed.  This is most easily accomplished with `Subset()` (from the `FSA` package) which requires the original data frame as the first argument and a conditioning statement as the second argument.
+```{r}
+d1I <- Subset(d1,lake=="Island")     # only Island
+d1M <- Subset(d1,lake=="Mitchell")   # only Mitchell
+d1T <- Subset(d1,lake=="Thompson")   # only Thompson
+```
+                                   
+### Kolmogorov-Smirnov Tests
+The Kolmogorov-Smirnov Test is performed in R with `ks.test()`.  This function requires the quantitative variable from one "group" (i.e., lake) as the first argument and the quantitative variable from the second "group" as the second argument.  The Komogorov-Smirnov results in the same order as presented in thebox are shown below.  You will notice that R gives a warning about computing p-values because the Kolmogorov-Smirnov Test is used to compare two *continuous* distributions in which it would theoretically be impossible to have tied values.  The discrete nature of length measurements violates this assumption.
+```{r}
+ks.test(d1M$length,d1T$length)
+ks.test(d1I$length,d1T$length)
+ks.test(d1I$length,d1M$length)
+```
+
+### Length Frequency Histograms
+Given that the test above is attempting to compare the *distribution* of lengths among the three lakes it would be a good idea to look at these distributions.  Histograms for each lake can be easily constructed with a formula in `hist()` as illustrated below.
+```{r fig.width=7, fig.height=7}
+hist(length~lake,data=d1,xlab="Total Length (mm)")
+```
+
+Alternatively, one can look at the empirical cumulative distribution functions for each lake superimposed upon each other.  The `ecdf()` function is used to find the empirical cumulative distribution function and `add=TRUE` is used to superimpose a subsequent plot on a previous plot.
+```{r}
+plot(ecdf(d1I$length),xlim=c(100,240),verticals=TRUE,pch=".",main="",
+     xlab="Total Length (mm)",lwd=2)
+plot(ecdf(d1M$length),col="blue",verticals=TRUE,pch=".",lwd=2,add=TRUE)
+plot(ecdf(d1T$length),col="red",verticals=TRUE,pch=".",lwd=2,add=TRUE)
+legend(100,0.99,legend=c("Island","Mitchell","Thopmson"),col=c("black","blue","red"),
+       pch=".",lwd=2,lty=1,cex=0.75)
+```
+
+
+## Testing for Differences among Length-Frequency Distributions by Means of the Kruskal-Wallis Test
+### Preparing Data
+The [Box9_1.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box9_1.txt) used here is the same file used in [Box 9.1](#testing-for-differences-in-mean-length-by-means-of-analysis-of-variance-anova) and is not re-read here.
+
+### Kruskal-Wallis Test
+The Kruskal-Wallis Test is performed in R with `kruskal.test()`.  This function requires the response variable as the first argument and the grouping factor variable as the second argument.
+```{r}
+kruskal.test(d1$length,d1$lake)
+```
+
+Histograms for each lake should be constructed as shown in [Box 9.2](#testing-for-differences-among-length-frequency-distributions-by-means-of-the-kolmogorov-smirnov-two-sample-test).
+
+
+## Performing Multiple Comparisons of Length-Frequency Data
+As a continuation of [Box 9.3](#testing-for-differences-among-length-frequency-distributions-by-means-of-the-kruskal-wallis-test), multiple comparisons following the significant Kruskal-Wallis test can be easily computed with `kruskalmc()`, from the `pgirmess` package.  This function requires the *response* variable as the first argument and the factor variable as the second argument.
+```{r}
+kruskalmc(d1$length,d1$lake)
+```
+
+
+## Using Contingency Tables to Test for Differences in Length-Frequency Distributions
+### Preparing Data
+As the data are presented in summarized form, it is easiest to just enter them directly into an R matrix.  Doing this requires `matrix()` with a list of the values as the first argument, the `nrow=` argument to indicate the number of rows in the matrix, and the `byrow=TRUE` argument to tell R that the values should be placed in the matrix by rows and then by columns.  The columns and rows can be named with `colnames()` and `rownames()` respectively.
+```{r}
+d5 <- matrix(c(85,77,44,124,34,251),nrow=3,byrow=TRUE)
+colnames(d5) <- c("Q","S-Q")
+rownames(d5) <- c("1996","1997","1998")
+d5
+```
+                                 
+### Chi-Square Test I
+Chi-square tests are performed in R with `chisq.test()`.  For this analysis, this function requires a matrix of the data as the only argument.  The expected values and residuals ($\frac{observed-expected}{\sqrt{expected}}$) are obtained by appending `$expected` and `$residuals` to the saved `chisq.test` object.
+```{r}
+( chi1 <- chisq.test(d5) )
+chi1$expected
+chi1$residuals
+```
+
+The final test statistic and p-value, cell contributions to the chi-square test statistic, and a combined table of observed and expected values can also be constructed with `chisq.detail()`, from the `TeachingDemos` package.
+```{r}
+chisq.detail(d5)
+```
+
+### Chi-Square Tests II
+The authors of the box discuss but do not show the 2x2 chi-square tests used to identify differences between pairs of years.  These three tests can be constructed with `chisqPostHoc()`, from the `NCStats` package.  This function requires the saved `chisq.test()` object as the first argument and a method to use for adjusting p-values for inflation due to multiple comparisons in the `control=` argument (see `?p.adjust` for more discussion on the different methods for controlling the error rate with multiple comparisons).  Finally, if the populations or groups to be compared were not in the rows of the original observed table (the groups in this example, i.e., the years, do form the rows so this argument is not required) then use the `popsInRows=FALSE` argument.  The results below indicate that the PSD differs significantly among all years in the study.
+```{r}
+chisqPostHoc(chi1,digits=6)
+```
+
+
+## Testing for Differences in Size Structure by Treating Groups of Fish Caught in Each Unit of Effort as Samples
+### Preparing Data
+The [Box9_6.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box9_6.txt) is read and the structure is observed below.  The authors create a new variable, `LOGIT`, that is the log of the ratio of `PREF` to `QUAL` after 0.5 had been added to each value to account for zeroes in the data.
+```{r}
+d6 <- read.table("data/Box9_6.txt",header=TRUE)
+str(d6)
+d6$LOGIT <- log((d6$PREF+0.5)/(d6$QUAL+0.5))
+d6
+```
+
+### Summary Statistics
+The summary statistics of the `LOGIT` values for each collection type is computed with `Summarize()` with the first argument containing a formula of the form `response`~`factor` and the argument `data=` set to the data frame containing the variables (these simple statistics are different from what is presented in the box.  I do not know why, as the raw data show above and the results of the linear model shown below perfectly match the results in the box).
+```{r}
+Summarize(LOGIT~METHOD,data=d6,digits=4)
+```
+
+### Model Fitting
+The model fit in the box can be fit in R with `lm()` using the same formula and `data=` arguments used in `Summarize()` as above.  The authors used a regression weighted on the number of quality fish collected.  These weights are used in `lm()` by setting the `weights=` argument to `QUAL`.  The ANOVA table is extracted from the saved `lm` object with `anova()`.
+```{r}
+lm1 <- lm(LOGIT~METHOD,data=d6,weights=QUAL)
+anova(lm1)
+```
+
+
+## Using Repeated-Measures ANOVA to Test for Size Structure Differences with Time-Dependent Data
+### Preparing Data
+The [Box9_7.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box9_7.txt) is read and the structure is observed below.  The level names in `sizegrp` are observed with `levels()` and the `site` and `year` variables were converted to factors with `factor()`
+```{r}
+d7 <- read.table("data/Box9_7.txt",header=TRUE)
+str(d7)
+levels(d7$sizegrp)
+d7$fsite <- factor(d7$site)
+d7$fyear <- factor(d7$year)
+```
+
+The authors then created a new variable, `period`, that indicates whether the data came from a year prior to implementation of the management regulation (i.e,. prior to 1990) or after the implementation.  This variable is created by first filling the variable with "APRE" and then replacing this name with "BPOST" for all years after 1990.  The new variable is then converted to a factor and the new data frame is viewed to see what was accomplished.  Finally, as noted by the authors, all age-0 fish were removed from the analysis (using `Subset()` and noting that `!=` means "not equals").
+```{r}
+d7$period <- "APRE"                  # initially fill completely with "APRE"
+d7$period[d7$year>1990] <- "BPOST"   # then replace post-1990 with "BPOST"
+d7$period <- factor(d7$period)       # explicitly make a factor
+view(d7)
+d7a <- Subset(d7,sizegrp!="age0")
+```
+
+This data frame, which has the `count` "stacked" for both the `slot` and `und` group must now be unstacked so that the logit of the ratio of fish in the slot to fish in the undersized category can be computed.  The `reshape()` function is a handy, if not cumbersome, method for converting between the stacked (what `reshape()` calls "long") format to unstacked (what `reshape()` calls "wide") format.  For our purposes, `reshape()` requires four arguments:
+
+
+* `data`: the data frame to be converted from (note that this is the first argument)
+* `direction`: this is the format to be converted to (i.e., we are converting *from* "long" *to* "wide")
+* `timevar`: this is the variable that contains the information on how the "long" data should be split into "wide" data.  In this case, we want to have `count` separated into two columns, one for undersized fish and one for slot length fish.
+* `idvar`: this is the variable or variables that will are repeated in the "long" format and should occur only once in the "wide" format.
+
+
+Thus, the appropriate `reshape()` command for this example is shown below with the resulting data frame viewed.  Notice that the counts of under- and slot-sized fish are contained in the `count.und` and `count.slot` variables for each `year`, `site`, and `period` combination.
+```{r}
+d7b <- reshape(d7a,direction="wide",timevar="sizegrp",idvar=c("site","year","fyear","period"))
+view(d7b)
+```
+
+Finally, the `undert`, `slott`, `total`, and `LOGIT` variables, as described in the box, are constructed.
+```{r}
+d7b$undert <- d7b$count.und+0.5
+d7b$slott <- d7b$count.slot+0.5
+d7b$total <- d7b$undert + d7b$slott
+d7b$LOGIT <- log(d7b$slott/d7b$undert)
+head(d7b)      # first 6 rows
+```
+
+### Normality Tests
+A variety of normality tests are available in R (see Box 3.9 in the [Chapter 3 vignette](https://fishr.wordpress.com/books/aiffd/)).  The Shapiro-Wilks test (the authors of the box refer to a "Wilk's Lambda" test of normality.  I do not believe that this is the correct term; Wilk's Lambda is used in multivariate means testing -- see this [short online article](http://www.blackwellpublishing.com/specialarticles/jcn_9_381.pdf) and assume that they mean Shapiro-Wilks normality test) is conducted with `shapiro.test()`.  The only required argument is a vector on which to test normality.
+```{r}
+shapiro.test(d7b$LOGIT[d7b$period=="APRE"])
+shapiro.test(d7b$LOGIT[d7b$period=="BPOST"])
+```
+
+The two normal quantile plots (presumably produced in the SAS program shown in the box) are constructed with `qqnorm()`.
+```{r}
+qqnorm(d7b$LOGIT[d7b$period=="APRE"],main="Pre-Regulation")
+qqnorm(d7b$LOGIT[d7b$period=="BPOST"],main="Post-Regulation")
+```
+
+### Repeated Measures ANOVA
+**THIS SECTION HAS NOT YET BEEN CONVERTED**
+
+```{r eval=FALSE, echo=FALSE, results='hide'}
+me1 <- lme(LOGIT~period,random=~1|fyear,weights=~total,correlation=corAR1(0,~fsite),data=d7b)
+```
+
+```{r eval=FALSE, echo=FALSE, results='hide'}
+library(lattice)
+dat <- read.table("data/http://www.ncfaculty.net/dogle/me_ex.txt", head=TRUE)
+names(dat) <- c('yr','site','per','tot','logit')
+dat <- transform(dat, yrf=factor(yr), site=factor(site))
+d0 <- dat
+
+#d0 <- groupedData(logit~per|yr, d0)
+bwplot(logit~per|site, d0)
+xyplot(logit~yr|site, d0, group=per, auto.key=TRUE)
+m2 <- lme(logit~per, data=d0, random=~1|site, weights=~tot, correlation=corAR1(form=~yr|site))
+
+m2a <- lme(logit~0+per, data=d0, random=~1|site, weights=~tot, correlation=corAR1(form=~yr|site))
+
+m3a <- lme(logit~0+per, data=d0, random=~1|yr, weights=~tot, correlation=corAR1(form=~yr|site))
+```
+
+--------------------------------------------------------------
+
+```{r echo=FALSE}
+et <- proc.time() - stime
+reproInfo(rqrdPkgs=rqrd,elapsed=et["user.self"]+et["sys.self"])
+```
+
+```{r echo=FALSE, results='hide', message=FALSE}
+purl2("Chapter9.Rmd",moreItems=c("source","rqrd","stime"))    # Will create the script file
+```
+
+--------------------------------------------------------------
+## References
