@@ -1,0 +1,128 @@
+---
+title: "AIFFD Chapter 15 - Community Indices, Parameters, and Comparisons"
+author: "Derek H. Ogle"
+csl: american-fisheries-society.csl
+output:
+  pdf_document:
+    fig_height: 3
+    fig_width: 3
+    number_sections: yes
+    pandoc_args: --number-offset=15
+    toc: yes
+    toc_depth: 2
+  html_document:
+    fig_height: 4.5
+    fig_width: 4.5
+    highlight: tango
+    number_sections: yes
+    pandoc_args: --number-offset=15
+    toc: yes
+    toc_depth: 2
+bibliography: AIFFDReferences.bib
+---
+\setcounter{section}{15}
+
+```{r echo=FALSE, include=FALSE}
+stime <- proc.time()    # Start time to get processing time
+source('knitr_setup.R')
+```
+
+--------------------------------------------------------------
+
+This document contains R versions of the boxed examples from **Chapter 15** of the "Analysis and Interpretation of Freshwater Fisheries Data" book.  Some sections build on descriptions from previous sections, so each section may not stand completely on its own.  More thorough discussions of the following items are available in linked vignettes:
+
+* the use of linear models in R in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/),
+* differences between and the use of type-I, II, and III sums-of-squares in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/), and
+* the use of "least-squares means" is found in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/).
+
+
+The following additional packages are required to complete all of the examples (with the required functions noted as a comment and also noted in the specific examples below).
+
+```{r echo=-1, warning=FALSE, message=FALSE}
+rqrd <- c("FSA")
+library(FSA)          #
+```
+
+In addition, external tab-delimited text files are used to hold the data required for each example.  These data are loaded into R in each example with `read.table()`.  Before using `read.table()` the working directory of R must be set to where these files are located on **your** computer.  The working directory for all data files on **my** computer is set with
+
+```{r}
+setwd("C:/aaaWork/Web/fishR/BookVignettes/aiffd2007")
+```
+
+In addition, I prefer to not show significance stars for hypothesis test output, reduce the margins on plots, alter the axis label positions, and reduce the axis tick length.  In addition, contrasts are set in such a manner as to force R output to match SAS output for linear model summaries.  All of these options are set with
+```{r eval=FALSE}
+options(width=90,continue=" ",show.signif.stars=FALSE,
+        contrasts=c("contr.sum","contr.poly"))
+par(mar=c(3.5,3.5,1,1),mgp=c(2.1,0.4,0),tcl=-0.2)
+```
+
+
+## Sample Data Set and Structural Indices
+During a 2-week period in 1988, a survey of the fishes of the Kankakee River, Illinois, was conducted using a boat-mounted electrofisher.  Six sites (stations) were each sampled eight times with effort standardized among samples (Peterson 1989; Kwak 1993).
+
+```{r}
+d <- read.table("data/Box15_1.txt",header=TRUE)
+str(d)
+```
+
+**NOT CONVERTED YET**
+
+## Estimation of Species Richness by Rarefaction
+A cumulative sample of fishes from station 1 of the Kankakee River, Illinois, included 648 individuals representing 26 species (see [Box 15.1](#sample-data-set-and-structural-indices)). Below, we estimate the expected species richness from a sample of 100 individuals.
+
+**NOT CONVERTED YET**
+
+## Calculation of Jaccard's and Simple Matching Coefficients
+To calculate both Jaccard's and simple matching coefficients, first determine the number of species present and absent for both stations and the number of species occurring at one station but not another.  Using the summary data for stations 1 and 2 on the Kankakee River, Illinois (see [Box 15.1](#sample-data-set-and-structural-indices)),
+
+* number of species present at both stations is $p = 18$,
+* number of species absent at both stations is $a = 4$, and
+* number of species present at one station but not the other is $m = 12$.
+
+**NOT CONVERTED YET**
+
+## Calculation of Spearman's Rank Correlation and Kendall's Tau Similarity Coefficients
+Species total abundances from stations 1 and 2 of the Kankakee River, Illinois ([Box 15.1](#sample-data-set-and-structural-indices)), are used to illustrate the calculation of Spearman's rank and Kendall's tau coefficients.
+
+**NOT CONVERTED YET**
+
+## Calculation of a Cophenetic Correlation Coefficient
+Fish assemblages of the Kankakee River, Illinois ([Box 15.1](#sample-data-set-and-structural-indices)), were clustered with the single-linkage method (Box 15.8). Below, we illustrate calculation of the matrix cophenetic correlation coefficient. The values in the cophenetic matrix are estimated from the single-linkage dendrogram (Box 15.8) by tracing the path connecting each pair of assemblages. For example, when tracing the linkage from station 1 upward through the tree and downward to station 2, the greatest distance is 177.45. The remaining values are similarly estimated and are included in the cophenetic matrix below.
+
+**NOT CONVERTED YET**
+
+## K-Means Clustering Analysis
+The following R program (analysis initially done in SAS) performs k-means clustering with PROC FASTCLUS on the summary fish abundance data for six stations on the Kankakee River, Illinois ([Box 15.1](#sample-data-set-and-structural-indices)). Three-letter codes are used in place of species names (see Box 15.11 for key to codes). The number of clusters, k = 3, is specified by the MAXCLUSTERS command. Note that this example is for illustration only.  The K-means clustering procedure should be used only when the number of assemblages (samples) exceeds 30.
+
+## Principal Components Analysis
+
+```{r}
+dt <- t(d[,-c(1:2)])        # transpose only the count portion
+colnames(dt) <- d$SpecCode  # use species codes to label columns (variable names)
+dt
+```
+
+```{r}
+res1 <- prcomp(dt,retx=TRUE,center=TRUE,scale.=TRUE)
+summary(res1)
+screeplot(res1)
+biplot(res1)
+pc1 <- res1$rotation[,1]  # first PCA loadings
+pc2 <- res1$rotation[,2]
+pc1s <- predict(res1)[,1] # first PCscore for each individual
+```
+
+--------------------------------------------------------------
+
+```{r echo=FALSE}
+et <- proc.time() - stime
+reproInfo(rqrdPkgs=rqrd,elapsed=et["user.self"]+et["sys.self"])
+```
+
+```{r echo=FALSE, results='hide', message=FALSE}
+purl2("Chapter15.Rmd",moreItems=c("source","rqrd","stime"))    # Will create the script file
+```
+
+
+--------------------------------------------------------------
+## References
