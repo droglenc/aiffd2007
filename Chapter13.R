@@ -324,4 +324,4 @@ for (i in 1:4) {                               # loop through ages
 round(cbind(slpsE,tE,slppE),5)                 # summary table
 
 
-# Script created at 2015-05-15 17:34:26
+# Script created at 2015-05-15 18:23:12

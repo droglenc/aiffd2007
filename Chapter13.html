@@ -304,7 +304,7 @@ img {
 <div id="population-projections-the-easier-way" class="section level3">
 <h3><span class="header-section-number">13.2.3</span> Population Projections (The Easier Way)</h3>
 <p>The <code>popbio</code> package provides several functions that make the Leslie matrix analysis easier (a paper describing the functions in the <code>popbio</code> package can be obtained <a href="http://www.jstatsoft.org/v22/i11/paper">here</a>). These functions will be illustrated here using the Leslie projection matrix <code>M</code> and initial population sizes <code>n0</code> from above. None of the rest of the analysis from the previous section is required for this section.</p>
-<p>The initial population can be projected into the future according the Leslie matrix with <code>pop.projection()</code>. This function requires the Leslie matrix as the first argument, the initial population size as the second argument, and the number of iterations into the future as the third argument. For example, the first eight iterations are constructed and saved to an object in the first line below. Various results can be extracted from the saved <code>pop.projection</code> object [the <code>popbio</code> package uses the more generic “stage” rather than “age” as the methods here can be used for transitions between any types of life stages (e.g., YOY, juvenile, adult), not just ages. See section 13.2.2.3 in the AIFFD book. Throughout this document “stage” means “age”]. For example, the</p>
+<p>The initial population can be projected into the future according the Leslie matrix with <code>pop.projection()</code>. This function requires the Leslie matrix as the first argument, the initial population size as the second argument, and the number of iterations into the future as the third argument. For example, the first eight iterations are constructed and saved to an object in the first line below. Various results can be extracted from the saved <code>pop.projection</code> object (the <code>popbio</code> package uses the more generic “stage” rather than “age” as the methods here can be used for transitions between any types of life stages (e.g., YOY, juvenile, adult), not just ages. See section 13.2.2.3 in the AIFFD book. Throughout this document “stage” means “age.”). For example, the</p>
 <pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>exp1 &lt;-<span class="st"> </span><span class="kw">pop.projection</span>(M,n0,<span class="dv">8</span>)
 &gt;<span class="st"> </span>exp1$stage.vectors</code></pre>
 <pre><code>   0   1  2   3   4   5     6      7
@@ -832,8 +832,8 @@ F-statistic: 17.87 on 1 and 9 DF,  p-value: 0.002217</code></pre>
 <hr />
 <pre><code>Reproducibility Information
   Compiled Date: Fri May 15 2015
-  Compiled Time: 5:34:26 PM
-  Code Execution Time: 4.17 s
+  Compiled Time: 6:23:11 PM
+  Code Execution Time: 4.91 s
 
   R Version: R version 3.2.0 (2015-04-16)
   System: Windows, i386-w64-mingw32/i386 (32-bit)
@@ -841,23 +841,23 @@ F-statistic: 17.87 on 1 and 9 DF,  p-value: 0.002217</code></pre>
   Required Packages: FSA, TTR, popbio and their dependencies (car, dplyr,
     gdata, gplots, Hmisc, knitr, lmtest, multcomp, plotrix, quadprog,
     relax, sciplot, xts)
-  Other Packages: FSA_0.6.13, knitr_1.10.5, popbio_2.4, quadprog_1.5-5,
-    rmarkdown_0.6.1, TTR_0.22-0, xts_0.9-7, zoo_1.7-12
+  Other Packages: car_2.0-25, FSA_0.6.13, knitr_1.10.5, plyr_1.8.2,
+    popbio_2.4, quadprog_1.5-5, rmarkdown_0.6.1, TTR_0.22-0, xts_0.9-7,
+    zoo_1.7-12
   Loaded-Only Packages: acepack_1.3-3.3, assertthat_0.1, bitops_1.0-6,
-    car_2.0-25, caTools_1.17.1, cluster_2.0.1, codetools_0.2-11,
-    colorspace_1.2-6, DBI_0.3.1, digest_0.6.8, dplyr_0.4.1, evaluate_0.7,
-    foreign_0.8-63, formatR_1.2, Formula_1.2-1, gdata_2.16.1,
-    ggplot2_1.0.1, gplots_2.17.0, grid_3.2.0, gridExtra_0.9.1,
-    gtable_0.1.2, gtools_3.4.2, highr_0.5, Hmisc_3.16-0, htmltools_0.2.6,
-    KernSmooth_2.23-14, lattice_0.20-31, latticeExtra_0.6-26, lme4_1.1-7,
-    lmtest_0.9-33, magrittr_1.5, MASS_7.3-40, Matrix_1.2-0, mgcv_1.8-6,
-    minqa_1.2.4, multcomp_1.4-0, munsell_0.4.2, mvtnorm_1.0-2,
-    nlme_3.1-120, nloptr_1.0.4, nnet_7.3-9, parallel_3.2.0, pbkrtest_0.4-2,
-    plotrix_3.5-11, plyr_1.8.2, proto_0.3-10, quantreg_5.11,
-    RColorBrewer_1.1-2, Rcpp_0.11.6, relax_1.3.15, reshape2_1.4.1,
-    rpart_4.1-9, sandwich_2.3-3, scales_0.2.4, sciplot_1.1-0, SparseM_1.6,
-    splines_3.2.0, stringi_0.4-1, stringr_1.0.0, survival_2.38-1,
-    TH.data_1.0-6, tools_3.2.0, yaml_2.1.13</code></pre>
+    caTools_1.17.1, cluster_2.0.1, codetools_0.2-11, colorspace_1.2-6,
+    DBI_0.3.1, digest_0.6.8, dplyr_0.4.1, evaluate_0.7, foreign_0.8-63,
+    formatR_1.2, Formula_1.2-1, gdata_2.16.1, ggplot2_1.0.1, gplots_2.17.0,
+    grid_3.2.0, gridExtra_0.9.1, gtable_0.1.2, gtools_3.4.2, highr_0.5,
+    Hmisc_3.16-0, htmltools_0.2.6, KernSmooth_2.23-14, lattice_0.20-31,
+    latticeExtra_0.6-26, lme4_1.1-7, lmtest_0.9-33, magrittr_1.5,
+    MASS_7.3-40, Matrix_1.2-0, mgcv_1.8-6, minqa_1.2.4, multcomp_1.4-0,
+    munsell_0.4.2, mvtnorm_1.0-2, nlme_3.1-120, nloptr_1.0.4, nnet_7.3-9,
+    parallel_3.2.0, pbkrtest_0.4-2, plotrix_3.5-11, proto_0.3-10,
+    quantreg_5.11, RColorBrewer_1.1-2, Rcpp_0.11.6, relax_1.3.15,
+    reshape2_1.4.1, rpart_4.1-9, sandwich_2.3-3, scales_0.2.4,
+    sciplot_1.1-0, SparseM_1.6, splines_3.2.0, stringi_0.4-1,
+    stringr_1.0.0, survival_2.38-1, TH.data_1.0-6, tools_3.2.0, yaml_2.1.13</code></pre>
 <hr />
 <div class="references">
 <h2>References</h2>
