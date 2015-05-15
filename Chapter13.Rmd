@@ -1,0 +1,665 @@
+---
+title: "AIFFD Chapter 13 - Fish Population Bioassessment"
+author: "Derek H. Ogle"
+csl: american-fisheries-society.csl
+output:
+  pdf_document:
+    fig_height: 3
+    fig_width: 3
+    number_sections: yes
+    pandoc_args: --number-offset=13
+    toc: yes
+    toc_depth: 2
+  html_document:
+    fig_height: 4.5
+    fig_width: 4.5
+    highlight: tango
+    number_sections: yes
+    pandoc_args: --number-offset=13
+    toc: yes
+    toc_depth: 2
+bibliography: AIFFDReferences.bib
+---
+\setcounter{section}{13}
+
+```{r echo=FALSE, include=FALSE}
+stime <- proc.time()    # Start time to get processing time
+source('knitr_setup.R')
+```
+
+--------------------------------------------------------------
+
+This document contains R versions of the boxed examples from **Chapter 13** of the "Analysis and Interpretation of Freshwater Fisheries Data" book.  Some sections build on descriptions from previous sections, so each section may not stand completely on its own.  More thorough discussions of the following items are available in linked vignettes:
+
+* the use of linear models in R in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/),
+* differences between and the use of type-I, II, and III sums-of-squares in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/), and
+* the use of "least-squares means" is found in the [preliminaries vignette](https://fishr.wordpress.com/books/aiffd/).
+
+
+The following additional packages are required to complete all of the examples (with the required functions noted as a comment and also noted in the specific examples below).
+
+```{r echo=-1, warning=FALSE, message=FALSE}
+rqrd <- c("FSA","TTR","popbio")
+library(FSA)          # fitPlot, hoCoef,lagratio, popSizesPlot, rcumsum, srFuns, srStarts
+library(TTR)          # SMA
+library(popbio)       # eigenanalysis
+```
+
+In addition, external tab-delimited text files are used to hold the data required for each example.  These data are loaded into R in each example with `read.table()`.  Before using `read.table()` the working directory of R must be set to where these files are located on **your** computer.  The working directory for all data files on **my** computer is set with
+
+```{r}
+setwd("C:/aaaWork/Web/fishR/BookVignettes/aiffd2007")
+```
+
+In addition, I prefer to not show significance stars for hypothesis test output, reduce the margins on plots, alter the axis label positions, and reduce the axis tick length.  In addition, contrasts are set in such a manner as to force R output to match SAS output for linear model summaries.  All of these options are set with
+```{r eval=FALSE}
+options(width=90,continue=" ",show.signif.stars=FALSE, contrasts=c("contr.sum","contr.poly"))
+par(mar=c(3.5,3.5,1,1),mgp=c(2.1,0.4,0),tcl=-0.2)
+```
+
+
+## Life Table Analysis
+Consider the following data obtained for the 1954 cohort of Brook Trout (*Salvelinus fontinalis*) from Hunt Creek, Michigan [@McFaddenetal1967].  Details of sampling methodology and estimation of the life table column data are given in @McFaddenetal1967.
+
+### Ogle Comments
+This vignette basically demonstrates how to use R as a calculator.  As this is pretty straightforward and the details are found in the box and associated chapter the descriptions here will be reserved for only the more complex calculations.
+
+Throughout this document I use $m_{x}$ rather than $b_{x}$ to represent the fertility rates.  With this change I will use $k$ to represent the number of age groups in the analysis.
+
+The results presented here are slightly different from those in the box as R retains many more decimal places than it shows and more decimal places then used in the box.  In addition, the iterative procedure for the Euler-Lotka equation near the end of this vignette was solved with a function here but was solved iteratively "by eye" in the box.  Thus, the results here will differ slightly from what was presented in the box.
+
+I also found the following errors/typos in this box:
+
+* the subscripts for $q_{x}$ and $p_{x}$ in the first row of table 13.2 should be $n_{x}$.  I did not check the rest of the table
+* the left-hand-side of equation 13.2 should be "1" (i.e., one) -- it appears to be an "l" (i.e. "el").
+* the provided $S_{x}$ equation does not seem to be implemented properly in the box.  It seems that $S_{m}$ should equal 0.5*$l_{m}$.  In the box it appears to be equal to $l_{m}$.
+* the $b_{x}$ values (note from above that I am calling this $m_{x}$) are never fully defined in the chapter or the box (what does "fertility rate" mean exactly?).  It appears that the $b_{x}$ in the chapter are the number of offspring born to a mother of age $x$.  If this is true then the top row in the Leslie matrix ($M$) on page 579 (equation 13.8) is not correct.  The top row should have fecundity ($f_{x}$), the per capita average number of female offspring reaching $n_{0}$ born from mothers of the age class $x$ -- i.e., the number of offspring produced at the next age class $m_{x+1}$ weighted by the probability of reaching the next age class or $f_{x}=p_{x}m_{x+1}$.
+
+### Preparing Data
+The ages (`x`) in the analysis is entered into a vector below.  Note that the colon between two integers results in a vector of sequential integers between the two values.  The number of ages (`k`) in this example is extracted with `length()` from the number of items in `x`.  The abundance (`nx`) and fecundity (`mx`) data were then entered into vectors by combining the values together with `c()`.
+```{r}
+( x <- 0:4 )
+( k <- length(x) )
+( nx <- c(52000,2118,779,159,13) )
+( mx <- c(0,0,43,122.6,346.2) )
+```
+
+### Filling Out the Life Table
+The vector of number of deaths is computed from the sequential differences in the abundance values.  Sequential differences are computed with `diff()`.  However, a zero must be concatenated to the end of the $n_{x}$ vector with `c()` so that the last difference is computed properly.  In addition, `diff()` computes the "second" values minus the "first" values, whereas we want the "first" values minus the "second" values.  Thus, the correct number of deaths (`dx`) is given by multiplying the results from `diff()` by "-1".  The age-specific mortality rate (`qx`), age-specific survival rates (`px`), and the proportion of initial animals that live to age-x (`lx`) are then computed from the previous results.
+```{r}
+( dx <- -1*diff(c(nx,0)) )
+( qx <- dx/nx )
+( px <- 1-qx )
+( lx <- nx/nx[1] )
+```
+
+The average number of animals alive in interval $x$ (`Lx`) can be computed with a simple moving average of adjacent abundance values.  The `SMA()` function from the `TDD` package computes a simple moving average of adjacent abundance values.  This function requires the vector of values as the first argument and the number of adjacent values to compute the moving average in the `n=` argument.  In this case, a "0" must again be added to the vector so that the last average is computed properly.  However, the result will be returned with an "NA" in the last position which should then be ignored (which is accomplished by appending `[-1]`) to the vector.
+```{r}
+( Lx <- SMA(c(nx,0),n=2)[-1] )
+```
+
+Three intermediate calculations are computed below.  Two of the functions use `rcumsum()` (from the `FSA` package) which computes the reverse cumulative sum -- i.e., the sum of the current value and each value after it in the vector.
+```{r}
+( Tx <- rcumsum(Lx) )
+( ex <- Tx/nx )
+# rcumsum includes the full last value, subtract half to effectively have added half
+( Sx <- rcumsum(lx)-0.5*lx[k] )
+```
+
+The following creates a vector of accidental deaths (`ax`; a vector of all zeroes as their were no accidental deaths).  The second line simply calculates the formula for an intermediate calculation.
+```{r}
+ax <- rep(0,k)
+# last entry below should be NA
+( Wx <- c((qx[1:(k-1)]*Sx[2:k]^2)/(px[1:(k-1)]*(nx[1:(k-1)]-0.5*ax[1:(k-1)])),NA) )
+```
+
+Put all of the results together into an expanded life table to see what has been accomplished.
+```{r}
+cbind(x,nx,dx,lx,qx,px,mx,Lx,Tx,Sx,Wx,ex)  # for display only
+```
+
+### Basic Calculations I
+The gross reproductive rate (`GRR`), net reproductive rate (`R0`), and mean generation time (`G`) are computed in the first three lines below following calculations shown in the box.  The variance and confidence interval for mean life expectancy at birth ($e_{0}$) is then computed.
+```{r}
+( GRR <- sum(mx) )
+( R0 <- sum(lx*mx) )
+( G <- sum(x*lx*mx)/R0 )
+( var.e0 <- sum(Wx,na.rm=TRUE) )
+( CI.e0 <- ex[1]+c(-1,1)*qt(0.975,nx[1]-1)*sqrt(var.e0) )
+```
+
+### Solving Euler-Lotka Equation
+The function below computes the Euler-Lotka equation sum minus 1 given a value of $r$, ages (in $x$), $l_{x}$, and $m_{x}$.  Note that the minus 1 means that, with this function, we will be looking for a value of $r$ that results in a value close to 0 rather than 1.  This modification allows one to use a root finding function to find the value of $r$ that provides a value of this function close to zero (within a level of precision).  The `uniroot()` function can be used to find this root.  This function requires the function as the first argument and a range of values for the first argument to the function (i.e., $r$ in this case) as the second argument, and data vectors for the other arguments to the function as the remaining arguments.  The second line below computes an initial value of $r$ as shown in the box, which I then used to define a range of values of $r$ to supply to the second argument of `uniroot()`.  Appending the `$root` suffix to the result provides just the value of $r$ that results in an Euler-Lotka value of 0.
+```{r}
+EL <- function(r,x,lx,mx) sum(exp(-r*x)*lx*mx)-1
+( r.init <- log(R0)/G )
+( r.final <- uniroot(EL,c(0.03,0.05),x,lx,mx)$root )
+```
+
+The following plots (right is a zoomed in version of the plot on the left) show the Euler-Lotka sum against the values of $r$ to illustrate the result from above.
+```{r}
+rs <- seq(0.03,0.05,0.00001)
+ELs <- sapply(rs,EL,x,lx,mx)
+plot(ELs~rs,type="l",xlab="Possible r",ylab="Euler-Lotka Value")
+abline(h=0,lty=3)
+abline(v=r.final,lwd=2,lty=3,col="red")
+plot(ELs~rs,type="l",xlab="Possible r",ylab="Euler-Lotka Value",xlim=c(0.039,0.041))
+abline(h=0,lty=3)
+abline(v=r.final,lwd=2,lty=3,col="red")
+```
+
+### Basic Calculations II
+The finite population rate (`lambda`), doubling time (`DT`), and stable age distribution proportions (`Cx`) are computed as shown below.
+```{r}
+( lambda <- exp(r.final) )
+( DT <- log(2)/r.final )
+Cx.int <- lambda^(-x)*lx
+( Cx <- Cx.int/sum(Cx.int) )
+```
+
+### Converting Life Table to Leslie Matrix
+The $l_{x}$ and $m_{x}$ portions of the life table can be converted to a Leslie matrix (see [Box 13.2](#leslie-matrix-model-analysis) for more information about Leslie matrices).  The dominant eigenvalue of the Leslie matrix is an estimate of $\lambda$ and the corresponding eigenvector, rescaled to sum to 1, is the stable age distribution.  The following function does this conversion (**ULTIMATELY I SHOULD DESCRIBE WHAT THIS DOES AS IT IS DIFFERENT FROM EQUATION 13.8**).
+```{r}
+lt2lm <- function(x,lx,mx) {
+  k <- length(x)  
+  px <- c(lagratio(lx),0)
+  fx <- px[1:(k-1)]*mx[2:k]
+  M <- cbind(rbind(fx,diag(px[-k],nrow=(k-1))),rep(0,k))
+  rownames(M) <- colnames(M) <- x
+  M
+}
+```
+
+The Leslie matrix (`M`) is then constructed in the first line below and `eigen.analysis()` (from the `popbio` package) provides the lambda and stable age distribution values from the Leslie matrix.
+```{r}
+( M <- lt2lm(x,lx,mx) )
+M.eig <- eigen.analysis(M)
+M.eig$lambda1
+M.eig$stable.stage
+log(M.eig$lambda1)  #shows this lambda is similar to r from above
+```
+
+
+## Leslie Matrix Model Analysis
+Consider a simple two-age-class population (age-0 and age-1) with age-class abundances as follows: $N_{0}=10$ and $N_{1}=5$.  
+Age-specific fecundities are $b_{0}=10$ and $b_{1}=25$ and age-specific mortality rates expressed as survival probabilities are $P_{0}=0.5$ and $P_{1}=0$.
+
+### Preparing Data
+The "only" data that needs to be entered is the Leslie matrix and a vector of initial populations size for each age.  Matrices are entered into R with `matrix()` which requires a vector of values as the first argument, the number of rows in the `nrow=` argument, and the fact that values should be entered into the matrix by rows and then columns with the `byrow=TRUE` argument.  The "more complex" Leslie matrix in the box is entered into R as shown below.  The columns and rows are then named with `colnames()` and `rownames()`, respectively.
+```{r}
+M <- matrix(c(0,5,10,0.5,0,0,0,0.2,0),nrow=3,byrow=TRUE)
+colnames(M) <- rownames(M) <- 1:3       # 1,2,3 for ages 1-3
+M
+```
+
+The initial population sizes is entered into a vector with `c()` and the cells named with `names())` as shown below.
+```{r}
+n0 <- c(0,0,10)
+names(n0) <- 1:3     # not really needed, but may help
+n0
+```
+
+### Population Projections (By Brute Force)
+The initial population can be projected one step into the future with matrix multiplication as shown in the box.  Two matrices or vectors are multiplied in R by placing the `%*%` operator between the matrix or vector objects.  For example, the matrix multiplication $n_{1}=Mn_{0}$ is accomplished with the first line below.  The second line shows the next step into the future.
+```{r}
+( n1 <- M %*% n0 )
+( n2 <- M %*% n1 )
+```
+
+We may iterate the next five steps in the process with a loop as follows (note that `cbind()` binds items together column-wise).
+```{r}
+exp0 <- cbind(n0,n1,n2)                            # first three values
+for (i in 3:7) exp0 <- cbind(exp0,M %*% exp0[,i])  # loop through next five
+colnames(exp0) <- 1:8                              # name for time steps
+exp0                                               # take a look
+```
+
+The total population size at each time step is obtained by summing each column in `exp0`.  This is most easily accomplished with `apply()` which requires the two-dimensional matrix as the first argument, the margin to which a function will be applied as the second argument (`margin=1` for rows and `margin=2` for columns), and the function to be applied (i.e., `sum()`) as the third argument.
+```{r}
+( N_exp0 <- apply(exp0,2,sum) )
+```
+
+The average finite rate of change in the population total ($\lambda$) is computed as the dominant eigenvalue of the Leslie matrix as discussed in the box.  The proportional stable age distribution is found by rescaling the eigenvector that corresponds to the dominant eigenvalue to a sum of 1.  The eigensystem analysis can be conducted in R with `eigen()` which requires the Leslie matrix as the first and only argument.  The dominant eigenvalue, or estimate of $\lambda$, is found by appending `$values[1]` to the saved `eigen` object.  The dominant eigenvector is found by appending `$vectors[1]` to the saved `eigen` object.  Dividing this vector by sum of itself produces the stable age distribution proportions.
+```{r}
+M.eig <- eigen(M)
+M.eig$values[1]
+M.eig$vectors[,1]/sum(M.eig$vectors[,1])
+```
+
+### Population Projections (The Easier Way)
+The `popbio` package provides several functions that make the Leslie matrix analysis easier (a paper describing the functions in the `popbio` package can be obtained [here](http://www.jstatsoft.org/v22/i11/paper)).  These functions will be illustrated here using the Leslie projection matrix `M` and initial population sizes `n0` from above.  None of the rest of the analysis from the previous section is required for this section.
+
+The initial population can be projected into the future according the Leslie matrix with `pop.projection()`.  This function requires the Leslie matrix as the first argument, the initial population size as the second argument, and the number of iterations into the future as the third argument.  For example, the first eight iterations are constructed and saved to an object in the first line below.  Various results can be extracted from the saved `pop.projection` object [the `popbio` package uses the more generic "stage" rather than "age" as the methods here can be used for transitions between any types of life stages (e.g., YOY, juvenile, adult), not just ages.  See section 13.2.2.3 in the AIFFD book.  Throughout this document "stage" means "age"].  For example, the
+```{r}
+exp1 <- pop.projection(M,n0,8)
+exp1$stage.vectors
+exp1$lambda
+exp1$stable.stage
+```
+
+However, if the user did not want to project the population first, these results could be obtained directly from the Leslie matrix with `eigen.analysis()`. 
+```{r}
+M.eig1 <- eigen.analysis(M)
+M.eig1$lambda1
+M.eig1$stable.stage
+```
+
+The stable age distribution, generation time,  and net reproductive rate can be computed directly from the Leslie matrix using `generation.time()` and `net.reproductive.rate()`.
+```{r}
+stable.stage(M)
+generation.time(M)
+net.reproductive.rate(M)
+```
+
+The *elasticities* mentioned in the chapter can be found with `elasticity()` and visually displayed from the saved object with `image2()`.  These results show that the finite rate of change is strongly related to age-1 survival and age-2 fecundity.
+```{r}
+( M.elast <- elasticity(M) )
+image2(M.elast)
+```
+
+Finally, the population can be projected for a few more years to get more interesting results.
+```{r}
+exp1 <- pop.projection(M,n0,30)
+exp1$lambda
+exp1$stable.stage
+```
+
+A plot of the overall population size is obtained with `popSizesPlot()`, from the `FSA` package.
+```{r}
+popSizesPlot(exp1)
+```
+
+The number of animals in each (st)age over time can be seen with `stage.vector.plot()`.  To emphasize the stable age distribution let's put those results on `stage.vector.plot()` with `abline()` using the "horizontal" option (`h=`).
+```{r}
+stage.vector.plot(exp1$stage.vector)
+abline(h=stable.stage(M),lwd=2,lty=3,col="red")
+```
+
+### Modeling Parameter Changes I
+```{r echo=FALSE, results='hide'}
+# for Sexpr below
+( M2 <- matrix(c(0,5,10,0.4,0,0,0,0.2,0),nrow=3,byrow=TRUE) )
+M2.eig <- eigen.analysis(M2)
+M2.eig$lambda1
+```
+In the box, the authors illustrate how to model different scenarios using the Leslie matrix.  In their first example, they consider the situation where some pollutant has reduced the survival rate of age-0 fish from 0.5 to 0.4.  The corresponding Leslie matrix is entered and the resulting $\lambda$ and stable age distribution are found.  From this one can see that the annual rate of change decreased from `r formatC(M.eig1$lambda1,format="f",digits=3)` to `r formatC(M2.eig$lambda1,format="f",digits=3)`.
+```{r}
+( M2 <- matrix(c(0,5,10,0.4,0,0,0,0.2,0),nrow=3,byrow=TRUE) )
+M2.eig <- eigen.analysis(M2)
+M2.eig$lambda1
+M2.eig$stable.stage
+```
+
+```{r echo=FALSE, results='hide'}
+( M3 <- matrix(c(0,15,12,0.5,0,0,0,0.2,0),nrow=3,byrow=TRUE) )
+M3.eig <- eigen.analysis(M3)
+M3.eig$lambda1
+```
+In their second example, the considered the situation where stocking added 10 more age-1 and 2 more age-2 fish at each time step.  Thus, one can see that the annual rate of change decreased from `r formatC(M.eig1$lambda1,format="f",digits=3)` to `r formatC(M3.eig$lambda1,format="f",digits=3)`.
+```{r}
+( M3 <- matrix(c(0,15,12,0.5,0,0,0,0.2,0),nrow=3,byrow=TRUE) )
+M3.eig <- eigen.analysis(M3)
+M3.eig$lambda1
+M3.eig$stable.stage
+```
+
+A graphic presentation of the impact of these changes can be seen by plotting population abundance versus time (left below) or log population abundance versus time (right below) for several time steps.   In the code below, note the use of `add=TRUE` to add the line to an already existing plot and `use.log=TRUE` to plot log population sizes on the y-axis.
+```{r}
+popSizesPlot(exp1)                                            # base case
+expM2 <- pop.projection(M2,n0,30)
+popSizesPlot(expM2,add=TRUE,col="red")                        # pollution scenario
+expM3 <- pop.projection(M3,n0,30)
+popSizesPlot(expM3,add=TRUE,col="blue")                       # stocking scenario
+legend("topleft",legend=c("base","pollution","stocking"),col=c("black","red","blue"),lwd=2)
+popSizesPlot(exp1,use.log=TRUE)
+popSizesPlot(expM2,add=TRUE,use.log=TRUE,col="red")
+popSizesPlot(expM3,add=TRUE,use.log=TRUE,col="blue")
+```
+
+### Modeling Parameter Changes II
+In their last example the authors of the box model the rate of population increase ($r=log(\lambda)$) against varying values of survival of age-1 fish to model what effect harvest regulations to reduce mortality of age-1 fish would have on overall population growth.  It appears that the authors modeled age-1 survival from 0.2 to 0.5 in increments of 0.02.  These values can be placed into a vector below.  These values of age-1 survival are sequentially placed into the 3rd row and 2nd column of the Leslie matrix to determine the impact on $r$.  These sequential calculations are most easily accomplished with a loop as shown below.
+
+```{r}
+( survs <- seq(0.2,0.5,0.02) )
+iters <- length(survs)                         # get the number of iterations
+rs <- numeric(iters)                           # initiate vector to hold r values
+for (i in 1:iters) {                           # loop i from 1 to number of iterations
+  Mtemp <- M                                   # put M matrix into Mtemp
+  Mtemp[3,2] <- survs[i]                       # replace with current survival rate
+  rs[i] <- log(eigen.analysis(Mtemp)$lambda1)  # find r and put in vector of rs
+}
+rs                                             # see if vector is filled
+```
+
+The illustrative plot can then be constructed with,
+```{r}
+plot(rs~survs,type="b",pch=19,xlab="Age-1 survival probability",
+     ylab="Rate of population increase (r)")
+abline(h=log(eigen.analysis(M)$lambda1),lty=2,col="red")
+```
+
+
+## Surplus Production Analysis
+Consider the data for a commercial Alewife (*Alosa pseudoharengus*) used in Box 8.7 in the [Chapter 8 vignette](https://fishr.wordpress.com/books/aiffd/) to illustrate the application of surplus production models.
+
+The parameters initial biomass ($B_{0}$), carrying capacity ($K$), catchability ($q$), and the intrinsic rate of growth ($r$) required to solve the model for biomass in period $t$ are given as $B_{0}$ = 732,506, $K$ = 1,160,771; $q$ = 0.0001484; and $r$ = 0.4049 as determined in the example in Box 8.7.  The resulting set of computations form the base case scenario for determining the possible impacts of reductions in the intrinsic rate of population increase (2% decline in $r$ to 0.396773), with the latter scenario requiring re-computation of the predicted biomass series by means of equation (13.20).  To determine further the offsetting reductions in catch required to compensate for changes in biomass caused by reducing $r$, a third set of calculations is performed using equation (13.20) to predict biomass.  Example computations are given below for 1.1% and 1.6% reductions in the catch rate.
+
+### Ogle Comment
+I found the following errors/typos in this box.
+
+* The years in the bottom table should be from 1986 through 1990 to match the top table (note that 1989 is missing).
+* Reference to equation 13.19 should actually be to equation 13.20.
+* The $r$ for a 2% decline is `r formatC(0.4049*0.98,format="f",digits=6)` rather than 0.396773.
+* We are never told what $p$ in equation 13.20 is in the box (I assumed $p=1$ and it matched the results in the box).
+* According to the calculations in this box, the subscript on $C$ in equation 13.20 should be $t+1$ rather than $t$.
+* In equation 13.20 there appears to be both a lower-case $p$ and an upper-case $P$.
+
+
+### Computations
+The base information or information that does not change among the scenarios was entered to objects.
+```{r}
+year <- c(NA,1986:1990)                        # year labels
+ct <- c(NA,90000,113300,155860,181128,198584)  # catches per year
+iters <- length(year)-1                        # number of iterations required
+
+K <- 1160771                                   # Carrying capacity
+q <- 0.0001484                                 # Catchability coef (given but not used)
+( B <- c(732506,rep(NA,length(year)-1)) )      # An initialized biomass vector
+r <- 0.4049                                    # Base intrinsic growth rate
+```
+
+Equation 13.20 was then computed using an iterative processing loop shown in the second line below.  First, however, a new vector that will hold the computed biomasses was initialized with `B` from above.
+```{r}
+B1 <- B
+for (i in 1:iters) B1[i+1] <- B1[i]+r*B1[i]*(1-B1[i]/K)-ct[i+1]
+B1
+```
+
+In the first change scenario, the intrinsic growth rate was reduced by 2% and the process used to develop the base scenario was repeated.
+```{r}
+( r <- 0.4049*0.98 )
+B2 <- B
+for (i in 1:iters) B2[i+1] <- B2[i]+r*B2[i]*(1-B2[i]/K)-ct[i+1]
+```
+
+In the second change scenario, the new `r` was still used, the catch vector was reduced by 1.6%, and the process was repeated.
+```{r}
+ct1 <- ct*0.984
+B3 <- B
+for (i in 1:iters) B3[i+1] <- B3[i]+r*B3[i]*(1-B3[i]/K)-ct1[i+1]
+```
+
+The third change scenario was exactly as above but with a 1.1% change in the catch vector.
+```{r}
+ct2 <- ct*0.989
+B4 <- B
+for (i in 1:iters) B4[i+1] <- B4[i]+r*B4[i]*(1-B4[i]/K)-ct2[i+1]
+```
+
+The results from the base scenario and all three change scenarios are column bound together (with `cbind()`) for ease of display.
+```{r}
+res <- round(cbind(year,ct,B1,B2,B3,B4),0)  # round for display only
+print(res,na.print="")                      # don't shown NAs
+```
+
+
+## Stock-Recruitment Analysis
+The Ricker stock-recruitment curve is used below on hypothetical data (shown in table in box) for a longitudinal study of a stream-dwelling population of Brown Trout (*Salmo trutta*).
+
+### Ogle Comments
+I found the following errors/typos in this box:
+
+* Reference to equations 13.28 and 13.26 on page 598 should both refer to equation 13.30.
+* It should be made clear that the equilibrium value is found by dividing log(alpha) by beta and not by logging alpha divided by beta.
+
+### Preparing Data
+The [Box13_4.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box13_4.txt) is read and observed below.  In addition, a natural log version of the number of recruits was computed and added as a new variable (`logR`) to the data frame.
+```{r}
+d4 <- read.table("data/Box13_4.txt",header=TRUE)
+str(d4)
+d4$logR <- log(d4$recruits)
+```
+}
+### Fitting Ricker Stock-Recruitment Model
+The fitting of stock-recruitment models was described in the Box 4.8 in the [Chapter 4 vignette](https://fishr.wordpress.com/books/aiffd/) and, in greater detail [here](../../../gnrlex/StockRecruit/StockRecruit.pdf).  Some of the simplifying functions described there will be used in this vignette.
+
+```{r echo=FALSE, results='hide'}
+# for Sexpr below
+sr1 <- srFuns("Ricker",param=1)
+( sr1s <- srStarts(recruits~stock,data=d4,type="Ricker",param=1) )
+sr1r <- nls(logR~log(sr1(stock,a,b)),data=d4,start=sr1s)
+```
+The Ricker stock-recruitment model is declared, starting values are determined, the model is fit to these data, and the model coefficients are extracted as shown below.  Thus, the fitted Ricker model has an alpha of `r formatC(coef(sr1r)[1],format="f",digits=4)` and a beta of `r formatC(coef(sr1r)[2],format="f",digits=5)`.
+```{r}
+sr1 <- srFuns("Ricker",param=1)
+( sr1s <- srStarts(recruits~stock,data=d4,type="Ricker",param=1) )
+sr1r <- nls(logR~log(sr1(stock,a,b)),data=d4,start=sr1s)
+coef(sr1r)
+```
+
+The fitted line plot with the 1:1 replacement line for these data is constructed below.  This plot illustrates the equilibrium replacement value of `r formatC(log(coef(sr1r)[1])/coef(sr1r)[2],format="f",digits=0)`.
+```{r}
+plot(recruits~stock,data=d4,pch=19,xlim=c(0,2000),ylim=c(0,2000))
+curve(sr1(x,coef(sr1r)[1],coef(sr1r)[2]),from=0,to=2000,col="red",lwd=2,add=TRUE)
+abline(coef=c(0,1),col="blue",lwd=2,lty=2)
+```
+
+As alpha is used extensively in the next section, I will save it to an object for simplicity.  Note that this saves many more decimal places then what is used in print in the book; thus, the results below will differ somewhat from the results printed in the book.  I also saved beta for the plotting at the end.
+```{r}
+( alpha <- coef(sr1r)[1] )
+( beta <- coef(sr1r)[2] )
+```
+
+### Modeling with Stock-Recruitment Curve
+In this example, the author supposes that the average adult fecundity ($E$) is 1000 and then uses equation 13.30 to determine the population independent mortality rate ($Z_{i}$).  
+```{r}
+E <- 1000
+( Zi <- log(E) - log(alpha) )
+```
+
+The author then asks us to consider a situation where the population independent mortality rate increases by 10%.  The rearrangement of equation 13.30 allows one to estimate a value of $\alpha$ given this new value of $Z_{i}$.
+```{r}
+( Zi.new <- Zi*1.10 )
+( alpha.new <- E*exp(-Zi.new) )
+```
+
+Under this scenario the base (shown in red) and new (shown in blue) Ricker stock-recruitment curves are visualized as shown below.  From this, one can see that the equilibrium replacement value declined from `r formatC(log(alpha)/beta,format="f",digits=0)` to `r formatC(log(alpha.new)/beta,format="f",digits=0)`.
+```{r}
+plot(recruits~stock,data=d4,pch=19,xlim=c(0,2000),ylim=c(0,2000))
+curve(sr1(x,alpha,beta),from=0,to=2000,col="red",lwd=2,add=TRUE)
+abline(coef=c(0,1),col="blue",lty=2,lwd=2)
+curve(sr1(x,alpha.new,beta),from=0,to=2000,col="blue",lwd=2,add=TRUE)
+```
+
+The plot on the left below shows the difference in "recruits" between the two lines (negative numbers represent the number of recruits lost by increased population independent mortality) and the difference in recruits as a percentage of the base number of recruits,
+```{r}
+stocksize <- 0:max(d4$stock)                 # create stock sizes to model over
+recruits1 <- sr1(stocksize,alpha,beta)       # predict recruits using base model
+recruits2 <- sr1(stocksize,alpha.new,beta)   # predict recruits with increased mortality
+diffrecruits <- recruits2-recruits1          # find difference in predicted recruits
+pdiffrecruits <- diffrecruits/recruits1*100  # express difference as a percentage of base
+plot(diffrecruits~stocksize,type="l",lwd=2,xlab="Stock Size",ylab="Loss of Recruits")
+plot(pdiffrecruits~stocksize,type="l",lwd=2,xlab="Stock Size",ylab="Percentage Loss of Recruits")
+```
+
+
+## Key-Factor Analysis
+Consider the data used in [Box 13.1](http://127.0.0.1:20036/rmd_output/2/#life-table-analysis) for the 1954 cohort of Brook Trout (*Salvelinus fontinalis*) from Hunt Creek, Michigan.  Those data were expanded to include the 1952 and 1953 cohorts (data shown in table in the box; @McFaddenetal1967).
+
+### Ogle Comment
+I found the following errors/typos in this box:
+
+* Reference to all equations are off by 1 -- e.g., reference to 13.52 should be to 13.53.
+* $K$ is defined in two different ways on page 607.  First it is defined as the ratio of $N_{m}$ to $N_{1}$ (equation 13.54) and then it is defined as the common log of this ratio (comparison of equations 13.56 and 13.55 and in the sentence just below equation 13.56).  In the box, $K$ is used as the log of the ratio.
+* Major column labels in the last table are backwards.  The subtable on the left should be labelled as $N_{t+1}$ versus $N_{t}$ and the subtable on the right as $N_{t}$ versus $N_{t+1}$
+* y-axis of first figure is labeled with an upper- rather than lower-case $k$.
+* As a suggestion, I would make it clear in equation 13.55 that *COMMON* logs are being used (could emphasize this in the lead-in sentence).
+
+### Preparing Data
+The [Box13_5.txt data file](https://raw.githubusercontent.com/droglenc/aiffd2007/master/data/Box13_5.txt) is read and observed below.  
+```{r}
+d5 <- read.table("data/Box13_5.txt",header=TRUE)
+str(d5)
+head(d5,n=10)   # first 10 rows
+```
+
+These data are in so-called *stacked* or *long* format where each age within a cohort appears in a separate row.  For ease of some analyses below, the data need to be in so-called *unstacked* or *wide* format where all information for one cohort appears in one variable or column.  The original data frame can be converted to wide format with `reshape()`.  **NEED MORE DESCRIPTION HERE**.
+```{r}
+d5a <- reshape(d5,v.names="abund",timevar="cohort",idvar="age",direction="wide")
+str(d5a)
+```
+In this format, the results for one cohort can be easily found by using subscripts.  For example, the abundance for the 1953 cohort is,
+```{r}
+d5a[,3]             # ask for 3rd column, or
+d5a[,"abund.1953"]  # by the name of the varible
+head(d5a)           # first 10 rows
+```
+
+For later use an object that contains the number of ages in the data was created.
+```{r}
+( m <- dim(d5a)[1] )
+```
+
+### Example Calculations for the 1953 Cohort
+The age specific survival rates ($w_{j}$) are found with `lagratio()`, from the `FSA` package.  This function computes the ratio of items in the vector given as the first argument when lagged by one position.  In other words, given a vector of abundances ($N$) `lagratio()` will compute $\frac{N_{t+1}}{N_{t}}$.  The lagged ratio is computed below and the *COMMON* log of the lagged ratios with the negative signs removed produce the $k$ values.
+```{r}
+( w.1953 <- lagratio(d5a[,"abund.1953"]) )
+( k.1953 <- abs(log10(w.1953)) )
+```
+
+The $K$ is then the sum of the $k$ values.
+```{r}
+( K.1953 <- sum(k.1953) )
+```
+
+### Calculations for All Cohorts
+The calculations for all cohorts can be simplified with a loop.  The analysis begins by saving the number of cohorts in the analysis into an object.  The code then creates a blank matrix to hold the $k$ values, using a loop to fill that vector (basically repeating the code from above for each cohort), and then renaming the row and columns of that matrix.
+```{r}
+( n.coh <- ncol(d5a)-1 )             # number of columns in d5a, -1 (for age column)
+( k <- matrix(rep(NA,n.coh*(m-1)),nrow=(m-1)) )             # initialize matrix
+for (i in 1:n.coh) k[,i] <- abs(log10(lagratio(d5a[,i+1]))) # need +1 to ignore age col
+rownames(k) <- c("k0","k1","k2","k3")                       # rename rows and col labels
+colnames(k) <- 1949:1959
+round(k,4)                                                  # rounded for display only
+```
+
+### Regression Analysis of $k$ Values
+In the box, the author first demonstrates plotting the $k_{i}$ and $K$ values against cohort year to visually estimate which $k_{i}$ most closely tracked the trend in $K$ and, thus, contributed 11most" to $K$.  The author used a plot with two y-axes for this procedure.  I'm not a fan of graphs with two y-axes so I will make side-by-side plots with the $k_{i}$ versus cohort year on one plot and $K$ versus cohort year on the other.  Before constructing these plots, the vector of $K$ values must be created as the sum of the $k_{i}$ values for a given cohort year.  In addition, it will be easier to work with the `k` matrix if it is transposed (using `t()`) so that a set of $k_{i}$ values is in a column.  Finally, before plotting, the cohort year numbers are extracted and saved to an object.  The plot of $k_{i}$ values against cohort year is then accomplished with `matplot()` which takes the x-axis values as the first argument, a matrix of y-axis values as the second argument, and then the usual optional control arguments.  The plot of $K$ against cohort year is simply accomplished with the familiar `plot()`.
+
+```{r}
+( K <- apply(k,2,sum) )
+( kt <- t(k) )
+yrs <- as.numeric(rownames(kt))
+matplot(yrs,kt,type="l",lwd=2,ylim=c(0,2),xlab="Cohort",ylab="k(i) values")
+legend("topleft",c("k0","k1","k2","k3"),lty=1:4,lwd=2,col=1:4,cex=0.8)
+plot(K~yrs,type="l",lwd=2,ylim=c(0,max(K)),xlab="Cohort",ylab="K")
+```
+
+The author also provided a table that summarized the slope and r-square values from the regressions of a $k_{i}$ on $K$.  These results, for $k_{0}$, are obtained with `lm()` and by submitting the saved `lm` object to `summary()`.
+```{r}
+lm1 <- lm(kt[,1]~K)
+summary(lm1)
+```
+
+The following loop is used to compute all four of these regressions, extract the desired results, and provide a summary table.
+```{r}
+slps <- slpp <- rsqs <- numeric(4)             # initialize vector to hold results
+for (i in 1:4) {                               # look through k values
+  lm1 <- lm(kt[,i]~K)                          # fit regression
+  slps[i] <- coef(lm1)[2]                      # extract slope
+  slpp[i] <- anova(lm1)[1,"Pr(>F)"]            # extract slope p-value
+  rsqs[i] <- cor(kt[,i],K)^2                   # extract r-squared
+}
+round(cbind(slps,slpp,rsqs),4)                 # summary table
+```
+
+### Regression Analysis to Demonstrate Density Dependence
+The author also demonstrated a method for determining if there was density dependent mortality demonstrated within any transition between age-classes.  This analysis is simplified by first omitting the age column from the data frame of abundance values.  Vector of adjacent ages then needs to be extracted from this matrix.  The code below extracts the common logarithm of the age-1 data and places it into a vector called `Ntp1` and then extracts the same for age-0 data and places it into a vector called `Ntp`.
+```{r}
+( d5b <- d5a[,-1]  )                             # delete age column for simplicity
+( Ntp1 <- log10(as.numeric(d5b[2,])) )
+( Ntp <- log10(as.numeric(d5b[1,])) )
+```
+
+```{r echo=FALSE, results='hide'}
+# for Sexpr below
+res1 <- lm(Ntp~Ntp1)
+```
+Now the regression of the "earlier age" on the "latter age" is fit with `lm()` and the coefficients extracted with `coef()`.  As the author of the box describes, the hypothesis test of interest is whether the slope from this regression is different from one or not.  The `hoCoef()` function (from the `FSA` package) is designed to assist with performing non-default hypothesis tests with regression coefficients.  This function requires the fitted model object as the first argument, an integer indicating which coefficient is being tests (i.e., slope=2), and the specific value in the null hypothesis (i.e., testing against a value of 1).  The result indicates that the slope is significant different (i.e., lower) than 1 (`r kPvalue(hoCoef(res1,2,1)[1,"p value"])`).
+```{r}
+res1 <- lm(Ntp~Ntp1)
+coef(res1)
+hoCoef(res1,2,1)
+```
+
+A similar test for the regression in the other direction is performed with,
+```{r}
+res2 <- lm(Ntp1~Ntp)
+coef(res2)
+hoCoef(res2,2,1)
+```
+
+Finally, similar results for all ages can be obtained through the following loop,
+```{r}
+slps1 <- slpp1 <- t1 <- numeric(4)      # initial vectors for 1st regression results
+slps2 <- slpp2 <- t2 <- numeric(4)      # initial vectors for 2nd regression results
+for (i in 1:4) {                        # loop through ages
+  tmp2 <- log10(as.numeric(d5b[i+1,]))
+  tmp1 <- log10(as.numeric(d5b[i,]))
+  lm1 <- lm(tmp2~tmp1)                  # first regression
+  slps1[i] <- coef(lm1)[2]              # extract results
+  temp <- hoCoef(lm1,2,1)
+  slpp1[i] <- temp[1,"p value"]
+  t1[i] <- temp[1,"T"]
+  lm2 <- lm(tmp1~tmp2)                  # second regression
+  slps2[i] <- coef(lm2)[2]              # extract results
+  temp <- hoCoef(lm2,2,1)
+  slpp2[i] <- temp[1,"p value"]
+  t2[i] <- temp[1,"T"] 
+}
+round(cbind(slps1,t1,slpp1,slps2,t2,slpp2),4)  # summary table
+```
+
+### @Elliott1994 Method
+At the very end of the box, the author illustrates a method due to @Elliott1994 for demonstrating if density dependent mortality exists among age classes.  These results are demonstrated for age-0 fish below.
+```{r}
+tmpN <- as.numeric(d5b[1,])                    # isolate abundance data for age-0
+tmpK <- as.numeric(k[1,])                      # isolate k data for age-0
+lm1 <- lm(tmpK~tmpN)                           # regression fitting
+summary(lm1)                                   # extract results
+```
+
+A plot showing the model fit can be obtained with `fitPlot()`, from the `FSA` package.
+```{r}
+fitPlot(lm1,xlab="Initial Age-0 Density",ylab="k-value from Age-0 to Age-1",main="")
+```
+
+Similar results for all age-classes can be obtained with the following loop.
+```{r}
+slpsE <- slppE <- tE <- numeric(4)             # initialize results vectors
+for (i in 1:4) {                               # loop through ages
+  tmpN <- as.numeric(d5b[i,])
+  tmpK <- as.numeric(k[i,])
+  lm1 <- lm(tmpK~tmpN)                         # fit regression
+  slpsE[i] <- coef(lm1)[2]                     # extract results
+  temp <- hoCoef(lm1,2)
+  slppE[i] <- temp[1,"p value"]
+  tE[i] <- temp[1,"T"]
+}
+round(cbind(slpsE,tE,slppE),5)                 # summary table
+```
+
+--------------------------------------------------------------
+
+```{r echo=FALSE}
+et <- proc.time() - stime
+reproInfo(rqrdPkgs=rqrd,elapsed=et["user.self"]+et["sys.self"])
+```
+
+```{r echo=FALSE, results='hide', message=FALSE}
+purl2("Chapter13.Rmd",moreItems=c("source","rqrd","stime"))    # Will create the script file
+```
+
+
+--------------------------------------------------------------
+## References
