@@ -8,11 +8,8 @@
 # Old bibliography files
 AIFFDReferences.bib.bak
 
-# Old knitr files
-old/
-.Rproj.user
-
 # Cache and other files
 *_cache/
 *_files/
 Figs/
+AIFFD_OLD/
