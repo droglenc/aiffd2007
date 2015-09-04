@@ -37,7 +37,7 @@ This document contains R versions of the boxed examples from **Chapter 3} of the
 
 The following additional packages are required to complete all of the examples (with the required functions noted as a comment and also noted in the specific examples below).
 
-```{r pkgs, echo=-1, warning=FALSE, message=FALSE}
+```{r echo=-1, warning=FALSE, message=FALSE}
 rqrd <- c("FSA","NCStats","arm","car","gdata","languageR","lattice","lme4","lsmeans","nortest","sciplot","survey")
 library(FSA)       # Summarize, fitPlot, binCI, view
 library(NCStats)   # sdCalc
@@ -382,7 +382,7 @@ lsmeans(lm1,~fbag_limit)
 
 ### A Means Plot
 The `fitPlot()` function from the `FSA` package is used to visually observe the mean (with default 95% CIs) catch rates of the different bag limit groups.  This function only requires the `lm` object as the first argument.  Optional arguments are used to label the x-axis, y-axis, and main title as illustrated below.
-```{r fitPlot3_8}
+```{r}
 fitPlot(lm1,xlab="Walleye Bag Limit",ylab="Walleye Catch Rate",main="")
 ```
 
