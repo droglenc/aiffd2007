@@ -2,9 +2,6 @@
 .Rhistory
 .Rapp.history
 
-# RStudio files
-.Rproj.user/
-
 # Old bibliography files
 AIFFDReferences.bib.bak
 
@@ -13,3 +10,4 @@ AIFFDReferences.bib.bak
 *_files/
 Figs/
 AIFFD_OLD/
+.Rproj.user
